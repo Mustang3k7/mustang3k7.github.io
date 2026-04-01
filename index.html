@@ -1,195 +1,537 @@
 <!--
-Nazwa: Dashboard temperatury (ThingSpeak + Plotly, wersja PRO)
+Nazwa: Dashboard temperatury PRO z analizą
 Cel:
-- Interaktywny podgląd temperatury z ThingSpeak z odświeżaniem na żywo.
-- Obsługa zoom/pan (pinch na telefonie), zakresów czasu i płynnej pracy
-  nawet przy dużej liczbie próbek (downsampling).
+- Wyświetlanie danych temperatury z ThingSpeak w formie aplikacyjnego dashboardu.
+- Pokazanie nie tylko wykresu, ale też podstawowej analizy:
+  aktualnej temperatury, minimum, maksimum, średniej, amplitudy,
+  trendu oraz prostego wskaźnika komfortu.
 Użycie:
-- Uzupełnij CHANNEL_ID i READ_API_KEY (jeśli kanał prywatny).
-- Otwórz plik w przeglądarce (PC/telefon).
-- Wybieraj zakres czasu, włącz/wyłącz AUTO (live).
+- Podmień aktualny plik index.html w repozytorium GitHub Pages.
+- Uzupełnij CHANNEL_ID oraz READ_API_KEY.
+- Otwórz stronę w przeglądarce na komputerze lub telefonie.
+- Wybieraj zakres czasu i korzystaj z automatycznego odświeżania.
 Uruchomienie:
-- Dwuklik na pliku .html lub host (np. GitHub Pages).
+- GitHub Pages: po zapisaniu zmian i odczekaniu chwili strona będzie dostępna pod adresem:
+  https://mustang3k7.github.io
+- Lokalnie: można otworzyć plik index.html bezpośrednio w przeglądarce.
 Wymagania:
-- Przeglądarka z JS, dostęp do Internetu.
-- ThingSpeak (publiczny lub prywatny + Read API Key).
+- Przeglądarka z obsługą JavaScript
+- Dostęp do Internetu
+- Kanał ThingSpeak z danymi temperatury
 Wynik:
-- Wykres temperatury z:
-  - zoom/pan (Plotly)
-  - live refresh (co X s)
-  - wybór zakresu (15 min / 1 h / 6 h / 24 h / 7 dni)
-  - licznik punktów i status
+- Interaktywny wykres temperatury
+- Panel analityczny z podstawowymi wskaźnikami
+- Interfejs zbliżony do aplikacji
 Zatrzymanie:
-- Wyłączenie AUTO lub zamknięcie strony.
+- Wyłączenie automatycznego odświeżania lub zamknięcie strony
 Uwagi:
-- ThingSpeak free: zapis >=15 s; odczyt można częściej, ale nie ma sensu
-  odświeżać szybciej niż zapis (tu domyślnie 20 s).
-- Limit zapytań i liczby punktów: używany jest downsampling do ~1500 pkt.
-- Dla kanału prywatnego wymagany READ_API_KEY (widoczny w kodzie strony).
-Data: 2026-04-01
+- Dane są tylko odczytywane z ThingSpeak, strona niczego tam nie zapisuje.
+- Dla kanału prywatnego wymagany jest READ_API_KEY.
+- Duże serie są redukowane do rozsądnej liczby punktów, aby wykres działał płynnie.
+- Wskaźnik komfortu jest uproszczony i ma charakter orientacyjny.
+Data: 2026-04-02
 Status: narzędzie
 
 Założenia i interpretacja działania:
-- ESP zapisuje dane w ThingSpeak.
-- Strona tylko odczytuje dane przez API i rysuje wykres.
-- Interaktywność zapewnia Plotly (zoom/pan, tooltip).
-- Dla wydajności duże serie są redukowane (downsampling) bez zmiany trendu.
+- ESP wysyła dane do ThingSpeak.
+- Ta strona pełni rolę interfejsu analitycznego.
+- Analiza jest liczona na podstawie aktualnie pobranego zakresu danych.
+- "Trend" oznacza prostą różnicę między pierwszym i ostatnim punktem w danym zakresie.
+- "Amplituda" oznacza różnicę między maksimum i minimum.
+- "Komfort" ma być prostym wizualnym wskaźnikiem do szybkiego podglądu, a nie pomiarem medycznym.
 -->
 
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="UTF-8">
-  <title>Dashboard temperatury</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard temperatury PRO</title>
 
-  <!-- Plotly (interaktywny wykres) -->
+  <!-- Biblioteka Plotly do interaktywnych wykresów -->
   <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 
   <style>
-    /* ====== WYGLĄD (CSS) ====== */
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
+    /* ==========================================================
+       GŁÓWNE KOLORY I ZMIENNE STYLU
+       ========================================================== */
+    :root {
+      --bg: #0b1220;
+      --bg-2: #111827;
+      --panel: #0f172a;
+      --panel-2: #162033;
+      --border: #243146;
+      --text: #e5edf8;
+      --muted: #9fb0c8;
+      --accent: #4f8cff;
+      --accent-2: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --shadow: rgba(0, 0, 0, 0.28);
     }
 
-    .topbar {
+    /* ==========================================================
+       BAZA
+       ========================================================== */
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background:
+        radial-gradient(circle at top right, #1a2a4a 0%, transparent 28%),
+        linear-gradient(180deg, var(--bg) 0%, #08101d 100%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      min-height: 100%;
+    }
+
+    body {
+      padding: 14px;
+    }
+
+    /* ==========================================================
+       UKŁAD GŁÓWNY
+       ========================================================== */
+    .app {
+      display: grid;
+      grid-template-columns: 1.05fr 2fr;
+      gap: 14px;
+      min-height: calc(100vh - 28px);
+    }
+
+    @media (max-width: 1100px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(11, 18, 32, 0.98));
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 14px 34px var(--shadow);
+    }
+
+    /* ==========================================================
+       LEWA KOLUMNA
+       ========================================================== */
+    .sidebar {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .hero {
+      padding: 18px;
+    }
+
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .current-temp-row {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .current-temp {
+      font-size: clamp(54px, 8vw, 78px);
+      line-height: 0.95;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #f8fbff;
+      text-shadow: 0 0 20px rgba(79, 140, 255, 0.14);
+    }
+
+    .current-unit {
+      font-size: 22px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .last-time {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .comfort-box {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .comfort-title {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .comfort-value {
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .comfort-sub {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      padding: 18px;
+    }
+
+    @media (max-width: 520px) {
+      .metrics {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .metric {
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    }
+
+    .metric-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .metric-value {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .metric-note {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    /* ==========================================================
+       PRAWA KOLUMNA
+       ========================================================== */
+    .main {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .toolbar {
+      padding: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toolbar-left,
+    .toolbar-right {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      padding: 10px;
-      background: #111827;
-      border-bottom: 1px solid #1f2937;
       align-items: center;
     }
 
-    .topbar button, .topbar select {
-      background: #1f2937;
-      color: #e2e8f0;
-      border: 1px solid #374151;
-      border-radius: 6px;
-      padding: 6px 10px;
+    .btn,
+    .select {
+      border: 1px solid var(--border);
+      background: #121b2c;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 9px 12px;
       cursor: pointer;
+      font-size: 14px;
     }
 
-    .topbar button.active {
-      background: #2563eb;
-      border-color: #2563eb;
+    .btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
     }
 
-    .topbar .spacer {
-      flex: 1;
+    .toggle-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 4px;
+      color: var(--muted);
+      font-size: 14px;
     }
 
     .status {
-      font-size: 12px;
-      opacity: 0.8;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .chart-card {
+      padding: 12px 12px 4px 12px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-height: 0;
+    }
+
+    .chart-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      padding: 4px 6px 10px 6px;
+      flex-wrap: wrap;
+    }
+
+    .chart-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .chart-subtitle {
+      color: var(--muted);
+      font-size: 13px;
     }
 
     #chart {
       width: 100%;
-      height: calc(100vh - 56px);
+      min-height: 420px;
+      height: calc(100vh - 220px);
     }
-  </style>
-</head>
 
-<body>
-
-  <!-- ====== PASEK STEROWANIA ====== -->
-  <div class="topbar">
-    <span>Zakres:</span>
-    <button data-range="15m">15 min</button>
-    <button data-range="1h" class="active">1 h</button>
-    <button data-range="6h">6 h</button>
-    <button data-range="24h">24 h</button>
-    <button data-range="7d">7 dni</button>
-
-    <span class="spacer"></span>
-
-    <label>AUTO</label>
-    <input id="autoToggle" type="checkbox" checked>
-
-    <span>Interwał:</span>
-    <select id="intervalSelect">
-      <option value="10">10 s</option>
-      <option value="20" selected>20 s</option>
-      <option value="30">30 s</option>
-      <option value="60">60 s</option>
-    </select>
-
-    <span class="status" id="status">Start...</span>
-  </div>
-
-  <!-- ====== WYKRES ====== -->
-  <div id="chart"></div>
-
-  <script>
-    // =========================
-    // KONFIGURACJA UŻYTKOWNIKA
-    // =========================
-
-    const CHANNEL_ID = 3317976;          // ← ustaw
-    const READ_API_KEY = "5X3O3RVY2FIIBGXO"; // ← ustaw (jeśli PRIVATE; dla publicznego może być "")
-
-    // Pole (field1)
-    const FIELD = 1;
-
-    // Maksymalna liczba punktów po redukcji (wydajność UI)
-    const MAX_POINTS = 1500;
-
-    // =========================
-    // STAN APLIKACJI
-    // =========================
-
-    let currentRange = '1h';
-    let timer = null;
-
-    const statusEl = document.getElementById('status');
-    const autoToggle = document.getElementById('autoToggle');
-    const intervalSelect = document.getElementById('intervalSelect');
-
-    // =========================
-    // MAPA ZAKRESÓW → PARAMETRY API
-    // =========================
-
-    function rangeToParams(range) {
-      // ThingSpeak API: można użyć minutes/days/results
-      switch (range) {
-        case '15m': return 'minutes=15';
-        case '1h':  return 'minutes=60';
-        case '6h':  return 'minutes=360';
-        case '24h': return 'days=1';
-        case '7d':  return 'days=7';
-        default:    return 'minutes=60';
+    @media (max-width: 1100px) {
+      #chart {
+        height: 480px;
       }
     }
 
-    // =========================
-    // BUDOWA URL
-    // =========================
+    /* ==========================================================
+       DROBNE AKCENTY KOLORÓW
+       ========================================================== */
+    .up { color: var(--warn); }
+    .down { color: var(--accent-2); }
+    .flat { color: var(--muted); }
+  </style>
+</head>
+<body>
 
+  <div class="app">
+    <!-- ======================================================
+         LEWA KOLUMNA: PANEL ANALITYCZNY
+         ====================================================== -->
+    <div class="sidebar">
+      <section class="card hero">
+        <div class="eyebrow">Dashboard temperatury</div>
+
+        <div class="current-temp-row">
+          <div id="currentTemp" class="current-temp">--.--</div>
+          <div class="current-unit">°C</div>
+        </div>
+
+        <div id="lastTime" class="last-time">Ostatni punkt: —</div>
+
+        <div class="comfort-box">
+          <div class="comfort-title">Ocena zakresu</div>
+          <div id="comfortValue" class="comfort-value">Brak danych</div>
+          <div id="comfortSub" class="comfort-sub">Panel pokaże orientacyjną ocenę po pobraniu danych.</div>
+        </div>
+      </section>
+
+      <section class="card metrics">
+        <div class="metric">
+          <div class="metric-label">Minimum</div>
+          <div id="minTemp" class="metric-value">--</div>
+          <div class="metric-note">Najniższa wartość w wybranym zakresie</div>
+        </div>
+
+        <div class="metric">
+          <div class="metric-label">Maksimum</div>
+          <div id="maxTemp" class="metric-value">--</div>
+          <div class="metric-note">Najwyższa wartość w wybranym zakresie</div>
+        </div>
+
+        <div class="metric">
+          <div class="metric-label">Średnia</div>
+          <div id="avgTemp" class="metric-value">--</div>
+          <div class="metric-note">Średnia arytmetyczna dla zakresu</div>
+        </div>
+
+        <div class="metric">
+          <div class="metric-label">Amplituda</div>
+          <div id="amplitude" class="metric-value">--</div>
+          <div class="metric-note">Różnica maksimum i minimum</div>
+        </div>
+
+        <div class="metric">
+          <div class="metric-label">Trend</div>
+          <div id="trendValue" class="metric-value">--</div>
+          <div id="trendNote" class="metric-note">Zmiana między pierwszym i ostatnim punktem</div>
+        </div>
+
+        <div class="metric">
+          <div class="metric-label">Liczba punktów</div>
+          <div id="pointCount" class="metric-value">--</div>
+          <div class="metric-note">Punkty po przetworzeniu do wykresu</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ======================================================
+         PRAWA KOLUMNA: KONTROLA I WYKRES
+         ====================================================== -->
+    <div class="main">
+      <section class="card toolbar">
+        <div class="toolbar-left">
+          <button class="btn active" data-range="15m">15 min</button>
+          <button class="btn" data-range="1h">1 h</button>
+          <button class="btn" data-range="6h">6 h</button>
+          <button class="btn" data-range="24h">24 h</button>
+          <button class="btn" data-range="7d">7 dni</button>
+        </div>
+
+        <div class="toolbar-right">
+          <label class="toggle-wrap">
+            <span>AUTO</span>
+            <input id="autoToggle" type="checkbox" checked />
+          </label>
+
+          <select id="intervalSelect" class="select">
+            <option value="10">10 s</option>
+            <option value="20" selected>20 s</option>
+            <option value="30">30 s</option>
+            <option value="60">60 s</option>
+          </select>
+
+          <button id="refreshBtn" class="btn">Odśwież</button>
+          <div id="status" class="status">Start...</div>
+        </div>
+      </section>
+
+      <section class="card chart-card">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title">Wykres temperatury</div>
+            <div class="chart-subtitle">Przesuwaj, powiększaj, analizuj zakres czasu</div>
+          </div>
+        </div>
+
+        <div id="chart"></div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================================
+    // KONFIGURACJA UŻYTKOWNIKA
+    // ==========================================================
+
+    // ID kanału ThingSpeak.
+    const CHANNEL_ID = 3317976;
+
+    // Klucz odczytu. Jeśli kanał jest publiczny, może być pusty.
+    const READ_API_KEY = "5X3O3RVY2FIIBGXO";
+
+    // Numer pola, z którego odczytywana jest temperatura.
+    const FIELD = 1;
+
+    // Maksymalna liczba punktów użytych do wykresu po redukcji.
+    const MAX_POINTS = 1600;
+
+    // ==========================================================
+    // STAN APLIKACJI
+    // ==========================================================
+
+    // Aktualnie wybrany zakres czasu.
+    let currentRange = "15m";
+
+    // Id timera automatycznego odświeżania.
+    let refreshTimer = null;
+
+    // Referencje do elementów interfejsu.
+    const statusEl = document.getElementById("status");
+    const autoToggleEl = document.getElementById("autoToggle");
+    const intervalSelectEl = document.getElementById("intervalSelect");
+    const refreshBtnEl = document.getElementById("refreshBtn");
+
+    const currentTempEl = document.getElementById("currentTemp");
+    const lastTimeEl = document.getElementById("lastTime");
+    const minTempEl = document.getElementById("minTemp");
+    const maxTempEl = document.getElementById("maxTemp");
+    const avgTempEl = document.getElementById("avgTemp");
+    const amplitudeEl = document.getElementById("amplitude");
+    const trendValueEl = document.getElementById("trendValue");
+    const trendNoteEl = document.getElementById("trendNote");
+    const pointCountEl = document.getElementById("pointCount");
+    const comfortValueEl = document.getElementById("comfortValue");
+    const comfortSubEl = document.getElementById("comfortSub");
+
+    // ==========================================================
+    // FUNKCJE POMOCNICZE
+    // ==========================================================
+
+    /*
+    Cel:
+    - Zamiana skrótu zakresu na parametry API ThingSpeak.
+    */
+    function rangeToParams(range) {
+      switch (range) {
+        case "15m": return "minutes=15";
+        case "1h":  return "minutes=60";
+        case "6h":  return "minutes=360";
+        case "24h": return "days=1";
+        case "7d":  return "days=7";
+        default:    return "minutes=15";
+      }
+    }
+
+    /*
+    Cel:
+    - Zbudowanie adresu URL do API ThingSpeak dla bieżącego zakresu.
+    */
     function buildUrl() {
       const rangeParam = rangeToParams(currentRange);
       let url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/fields/${FIELD}.json?${rangeParam}`;
 
-      // dla kanału prywatnego
       if (READ_API_KEY && READ_API_KEY.length > 0) {
         url += `&api_key=${READ_API_KEY}`;
       }
 
-      // limit bezpieczeństwa
       url += `&results=8000`;
-
       return url;
     }
 
-    // =========================
-    // DOWNSAMPLING (redukcja punktów)
-    // =========================
-
+    /*
+    Cel:
+    - Redukcja liczby punktów do płynnego działania wykresu.
+    - Jeśli punktów jest mało, nic nie zmienia.
+    */
     function downsample(xArr, yArr, maxPoints) {
       const n = xArr.length;
+
       if (n <= maxPoints) {
         return { x: xArr, y: yArr };
       }
@@ -206,120 +548,340 @@ Założenia i interpretacja działania:
       return { x, y };
     }
 
-    // =========================
-    // POBIERANIE DANYCH
-    // =========================
+    /*
+    Cel:
+    - Obliczenie podstawowych statystyk dla tablicy liczbowej.
+    */
+    function calculateStats(values) {
+      if (!values || values.length === 0) {
+        return null;
+      }
 
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+      const amplitude = max - min;
+      const trend = values[values.length - 1] - values[0];
+
+      return {
+        min,
+        max,
+        avg,
+        amplitude,
+        trend
+      };
+    }
+
+    /*
+    Cel:
+    - Sformatowanie czasu do czytelnej lokalnej postaci.
+    */
+    function formatDateTime(isoString) {
+      const date = new Date(isoString);
+      return date.toLocaleString("pl-PL");
+    }
+
+    /*
+    Cel:
+    - Wyznaczenie uproszczonego wskaźnika komfortu dla temperatury.
+    - Jest to wskaźnik orientacyjny, nie medyczny.
+    */
+    function evaluateComfort(temp) {
+      if (temp == null || Number.isNaN(temp)) {
+        return {
+          label: "Brak danych",
+          sub: "Nie udało się wyznaczyć oceny zakresu."
+        };
+      }
+
+      if (temp < 17.0) {
+        return {
+          label: "Za chłodno",
+          sub: "Temperatura jest raczej niska. Do snu może być zbyt zimno."
+        };
+      }
+
+      if (temp >= 17.0 && temp <= 19.5) {
+        return {
+          label: "Bardzo dobry zakres",
+          sub: "Zakres zwykle uznawany za korzystny dla snu i odpoczynku."
+        };
+      }
+
+      if (temp > 19.5 && temp <= 22.5) {
+        return {
+          label: "Dobry / neutralny zakres",
+          sub: "Temperatura wygląda rozsądnie, ale warto obserwować własny komfort."
+        };
+      }
+
+      if (temp > 22.5 && temp <= 25.0) {
+        return {
+          label: "Dość ciepło",
+          sub: "Może być odczuwalne jako zbyt ciepłe, zwłaszcza przy śnie."
+        };
+      }
+
+      return {
+        label: "Za ciepło",
+        sub: "Wysoka temperatura może pogarszać zasypianie i jakość snu."
+      };
+    }
+
+    /*
+    Cel:
+    - Sformatowanie trendu do czytelnej postaci z kierunkiem.
+    */
+    function formatTrend(trend) {
+      const abs = Math.abs(trend).toFixed(3);
+
+      if (trend > 0.02) {
+        return {
+          text: `↑ ${abs} °C`,
+          cls: "up",
+          note: "Temperatura rośnie w obrębie wybranego zakresu."
+        };
+      }
+
+      if (trend < -0.02) {
+        return {
+          text: `↓ ${abs} °C`,
+          cls: "down",
+          note: "Temperatura spada w obrębie wybranego zakresu."
+        };
+      }
+
+      return {
+        text: `→ ${abs} °C`,
+        cls: "flat",
+        note: "Temperatura jest względnie stabilna w obrębie wybranego zakresu."
+      };
+    }
+
+    // ==========================================================
+    // POBIERANIE DANYCH
+    // ==========================================================
+
+    /*
+    Cel:
+    - Pobranie danych z ThingSpeak.
+    - Odfiltrowanie pustych wartości.
+    - Redukcja liczby punktów dla płynności.
+    */
     async function fetchData() {
       const url = buildUrl();
-      statusEl.textContent = 'Pobieranie...';
+      statusEl.textContent = "Pobieranie...";
 
       try {
-        const res = await fetch(url);
-        const data = await res.json();
+        const response = await fetch(url);
+        const data = await response.json();
 
         if (!data.feeds || data.feeds.length === 0) {
-          statusEl.textContent = 'Brak danych';
+          statusEl.textContent = "Brak danych";
           return { x: [], y: [] };
         }
 
-        const x = [];
-        const y = [];
+        const rawX = [];
+        const rawY = [];
 
-        data.feeds.forEach(f => {
-          if (f.field1 !== null) {
-            x.push(f.created_at);
-            y.push(parseFloat(f.field1));
+        data.feeds.forEach(feed => {
+          if (feed.field1 !== null) {
+            rawX.push(feed.created_at);
+            rawY.push(parseFloat(feed.field1));
           }
         });
 
-        // redukcja punktów dla płynności
-        const reduced = downsample(x, y, MAX_POINTS);
+        const reduced = downsample(rawX, rawY, MAX_POINTS);
 
         statusEl.textContent = `OK | punkty: ${reduced.x.length}`;
-
         return reduced;
 
-      } catch (err) {
-        console.error(err);
-        statusEl.textContent = 'Błąd pobierania';
+      } catch (error) {
+        console.error(error);
+        statusEl.textContent = "Błąd pobierania";
         return { x: [], y: [] };
       }
     }
 
-    // =========================
-    // RYSOWANIE / AKTUALIZACJA
-    // =========================
+    // ==========================================================
+    // AKTUALIZACJA PANELU ANALITYCZNEGO
+    // ==========================================================
 
-    async function render() {
-      const { x, y } = await fetchData();
+    /*
+    Cel:
+    - Aktualizacja wszystkich wskaźników po lewej stronie.
+    */
+    function updateAnalysisPanel(x, y) {
+      if (!x.length || !y.length) {
+        currentTempEl.textContent = "--.--";
+        lastTimeEl.textContent = "Ostatni punkt: —";
+        minTempEl.textContent = "--";
+        maxTempEl.textContent = "--";
+        avgTempEl.textContent = "--";
+        amplitudeEl.textContent = "--";
+        trendValueEl.textContent = "--";
+        trendValueEl.className = "metric-value";
+        trendNoteEl.textContent = "Brak danych do analizy.";
+        pointCountEl.textContent = "0";
+        comfortValueEl.textContent = "Brak danych";
+        comfortSubEl.textContent = "Panel pokaże orientacyjną ocenę po pobraniu danych.";
+        return;
+      }
 
+      const currentTemp = y[y.length - 1];
+      const lastTime = x[x.length - 1];
+      const stats = calculateStats(y);
+      const comfort = evaluateComfort(currentTemp);
+      const trendInfo = formatTrend(stats.trend);
+
+      currentTempEl.textContent = currentTemp.toFixed(2);
+      lastTimeEl.textContent = `Ostatni punkt: ${formatDateTime(lastTime)}`;
+
+      minTempEl.textContent = `${stats.min.toFixed(2)} °C`;
+      maxTempEl.textContent = `${stats.max.toFixed(2)} °C`;
+      avgTempEl.textContent = `${stats.avg.toFixed(2)} °C`;
+      amplitudeEl.textContent = `${stats.amplitude.toFixed(3)} °C`;
+
+      trendValueEl.textContent = trendInfo.text;
+      trendValueEl.className = `metric-value ${trendInfo.cls}`;
+      trendNoteEl.textContent = trendInfo.note;
+
+      pointCountEl.textContent = `${y.length}`;
+      comfortValueEl.textContent = comfort.label;
+      comfortSubEl.textContent = comfort.sub;
+    }
+
+    // ==========================================================
+    // RYSOWANIE WYKRESU
+    // ==========================================================
+
+    /*
+    Cel:
+    - Narysowanie lub odświeżenie wykresu Plotly.
+    */
+    function renderChart(x, y) {
       const trace = {
-        x,
-        y,
-        mode: 'lines',
-        name: 'Temperatura',
-        line: { color: '#22c55e', width: 2 }
+        x: x,
+        y: y,
+        mode: "lines",
+        name: "Temperatura",
+        line: {
+          color: "#4f8cff",
+          width: 2.4
+        },
+        fill: "tozeroy",
+        fillcolor: "rgba(79, 140, 255, 0.08)"
       };
 
       const layout = {
-        margin: { l: 50, r: 20, t: 30, b: 50 },
-        paper_bgcolor: '#0f172a',
-        plot_bgcolor: '#0f172a',
-        font: { color: '#e2e8f0' },
+        margin: { l: 56, r: 18, t: 12, b: 50 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        font: { color: "#e5edf8" },
+        dragmode: "pan",
         xaxis: {
-          title: 'Czas',
-          gridcolor: '#1f2937'
+          title: "Czas",
+          gridcolor: "#243146",
+          zerolinecolor: "#243146"
         },
         yaxis: {
-          title: '°C',
-          gridcolor: '#1f2937'
+          title: "°C",
+          gridcolor: "#243146",
+          zerolinecolor: "#243146"
         },
-        dragmode: 'pan' // domyślnie przesuwanie
+        showlegend: false
       };
 
-      Plotly.react('chart', [trace], layout, { responsive: true });
+      const config = {
+        responsive: true,
+        displaylogo: false
+      };
+
+      Plotly.react("chart", [trace], layout, config);
     }
 
-    // =========================
-    // AUTO REFRESH
-    // =========================
+    // ==========================================================
+    // GŁÓWNA AKTUALIZACJA
+    // ==========================================================
 
+    /*
+    Cel:
+    - Pobranie danych i odświeżenie całego dashboardu.
+    */
+    async function renderDashboard() {
+      const { x, y } = await fetchData();
+      updateAnalysisPanel(x, y);
+      renderChart(x, y);
+    }
+
+    // ==========================================================
+    // TIMER AUTO-REFRESH
+    // ==========================================================
+
+    /*
+    Cel:
+    - Restart automatycznego odświeżania po zmianie ustawień.
+    */
     function restartTimer() {
-      if (timer) clearInterval(timer);
+      if (refreshTimer) {
+        clearInterval(refreshTimer);
+      }
 
-      if (!autoToggle.checked) return;
+      if (!autoToggleEl.checked) {
+        return;
+      }
 
-      const intervalSec = parseInt(intervalSelect.value, 10);
-      timer = setInterval(render, intervalSec * 1000);
+      const intervalSec = parseInt(intervalSelectEl.value, 10);
+      refreshTimer = setInterval(renderDashboard, intervalSec * 1000);
     }
 
-    // =========================
+    // ==========================================================
     // OBSŁUGA UI
-    // =========================
+    // ==========================================================
 
-    document.querySelectorAll('.topbar button[data-range]')
-      .forEach(btn => {
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('.topbar button').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-
-          currentRange = btn.dataset.range;
-          render();
-        });
+    /*
+    Cel:
+    - Obsługa przycisków zakresu czasu.
+    */
+    document.querySelectorAll(".btn[data-range]").forEach(button => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".btn[data-range]").forEach(btn => btn.classList.remove("active"));
+        button.classList.add("active");
+        currentRange = button.dataset.range;
+        renderDashboard();
       });
+    });
 
-    autoToggle.addEventListener('change', restartTimer);
-    intervalSelect.addEventListener('change', restartTimer);
+    /*
+    Cel:
+    - Obsługa przełącznika AUTO.
+    */
+    autoToggleEl.addEventListener("change", restartTimer);
 
-    // =========================
+    /*
+    Cel:
+    - Obsługa zmiany interwału automatycznego odświeżania.
+    */
+    intervalSelectEl.addEventListener("change", restartTimer);
+
+    /*
+    Cel:
+    - Ręczne odświeżenie po kliknięciu przycisku.
+    */
+    refreshBtnEl.addEventListener("click", () => {
+      renderDashboard();
+    });
+
+    // ==========================================================
     // START
-    // =========================
+    // ==========================================================
 
-    render();
+    /*
+    Cel:
+    - Uruchomienie dashboardu po załadowaniu strony.
+    */
+    renderDashboard();
     restartTimer();
-
   </script>
-
 </body>
 </html>
