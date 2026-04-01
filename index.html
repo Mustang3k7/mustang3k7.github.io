@@ -1,0 +1,325 @@
+<!--
+Nazwa: Dashboard temperatury (ThingSpeak + Plotly, wersja PRO)
+Cel:
+- Interaktywny podgląd temperatury z ThingSpeak z odświeżaniem na żywo.
+- Obsługa zoom/pan (pinch na telefonie), zakresów czasu i płynnej pracy
+  nawet przy dużej liczbie próbek (downsampling).
+Użycie:
+- Uzupełnij CHANNEL_ID i READ_API_KEY (jeśli kanał prywatny).
+- Otwórz plik w przeglądarce (PC/telefon).
+- Wybieraj zakres czasu, włącz/wyłącz AUTO (live).
+Uruchomienie:
+- Dwuklik na pliku .html lub host (np. GitHub Pages).
+Wymagania:
+- Przeglądarka z JS, dostęp do Internetu.
+- ThingSpeak (publiczny lub prywatny + Read API Key).
+Wynik:
+- Wykres temperatury z:
+  - zoom/pan (Plotly)
+  - live refresh (co X s)
+  - wybór zakresu (15 min / 1 h / 6 h / 24 h / 7 dni)
+  - licznik punktów i status
+Zatrzymanie:
+- Wyłączenie AUTO lub zamknięcie strony.
+Uwagi:
+- ThingSpeak free: zapis >=15 s; odczyt można częściej, ale nie ma sensu
+  odświeżać szybciej niż zapis (tu domyślnie 20 s).
+- Limit zapytań i liczby punktów: używany jest downsampling do ~1500 pkt.
+- Dla kanału prywatnego wymagany READ_API_KEY (widoczny w kodzie strony).
+Data: 2026-04-01
+Status: narzędzie
+
+Założenia i interpretacja działania:
+- ESP zapisuje dane w ThingSpeak.
+- Strona tylko odczytuje dane przez API i rysuje wykres.
+- Interaktywność zapewnia Plotly (zoom/pan, tooltip).
+- Dla wydajności duże serie są redukowane (downsampling) bez zmiany trendu.
+-->
+
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard temperatury</title>
+
+  <!-- Plotly (interaktywny wykres) -->
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+  <style>
+    /* ====== WYGLĄD (CSS) ====== */
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px;
+      background: #111827;
+      border-bottom: 1px solid #1f2937;
+      align-items: center;
+    }
+
+    .topbar button, .topbar select {
+      background: #1f2937;
+      color: #e2e8f0;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+
+    .topbar button.active {
+      background: #2563eb;
+      border-color: #2563eb;
+    }
+
+    .topbar .spacer {
+      flex: 1;
+    }
+
+    .status {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    #chart {
+      width: 100%;
+      height: calc(100vh - 56px);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ====== PASEK STEROWANIA ====== -->
+  <div class="topbar">
+    <span>Zakres:</span>
+    <button data-range="15m">15 min</button>
+    <button data-range="1h" class="active">1 h</button>
+    <button data-range="6h">6 h</button>
+    <button data-range="24h">24 h</button>
+    <button data-range="7d">7 dni</button>
+
+    <span class="spacer"></span>
+
+    <label>AUTO</label>
+    <input id="autoToggle" type="checkbox" checked>
+
+    <span>Interwał:</span>
+    <select id="intervalSelect">
+      <option value="10">10 s</option>
+      <option value="20" selected>20 s</option>
+      <option value="30">30 s</option>
+      <option value="60">60 s</option>
+    </select>
+
+    <span class="status" id="status">Start...</span>
+  </div>
+
+  <!-- ====== WYKRES ====== -->
+  <div id="chart"></div>
+
+  <script>
+    // =========================
+    // KONFIGURACJA UŻYTKOWNIKA
+    // =========================
+
+    const CHANNEL_ID = 3317976;          // ← ustaw
+    const READ_API_KEY = "5X3O3RVY2FIIBGXO"; // ← ustaw (jeśli PRIVATE; dla publicznego może być "")
+
+    // Pole (field1)
+    const FIELD = 1;
+
+    // Maksymalna liczba punktów po redukcji (wydajność UI)
+    const MAX_POINTS = 1500;
+
+    // =========================
+    // STAN APLIKACJI
+    // =========================
+
+    let currentRange = '1h';
+    let timer = null;
+
+    const statusEl = document.getElementById('status');
+    const autoToggle = document.getElementById('autoToggle');
+    const intervalSelect = document.getElementById('intervalSelect');
+
+    // =========================
+    // MAPA ZAKRESÓW → PARAMETRY API
+    // =========================
+
+    function rangeToParams(range) {
+      // ThingSpeak API: można użyć minutes/days/results
+      switch (range) {
+        case '15m': return 'minutes=15';
+        case '1h':  return 'minutes=60';
+        case '6h':  return 'minutes=360';
+        case '24h': return 'days=1';
+        case '7d':  return 'days=7';
+        default:    return 'minutes=60';
+      }
+    }
+
+    // =========================
+    // BUDOWA URL
+    // =========================
+
+    function buildUrl() {
+      const rangeParam = rangeToParams(currentRange);
+      let url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/fields/${FIELD}.json?${rangeParam}`;
+
+      // dla kanału prywatnego
+      if (READ_API_KEY && READ_API_KEY.length > 0) {
+        url += `&api_key=${READ_API_KEY}`;
+      }
+
+      // limit bezpieczeństwa
+      url += `&results=8000`;
+
+      return url;
+    }
+
+    // =========================
+    // DOWNSAMPLING (redukcja punktów)
+    // =========================
+
+    function downsample(xArr, yArr, maxPoints) {
+      const n = xArr.length;
+      if (n <= maxPoints) {
+        return { x: xArr, y: yArr };
+      }
+
+      const step = Math.ceil(n / maxPoints);
+      const x = [];
+      const y = [];
+
+      for (let i = 0; i < n; i += step) {
+        x.push(xArr[i]);
+        y.push(yArr[i]);
+      }
+
+      return { x, y };
+    }
+
+    // =========================
+    // POBIERANIE DANYCH
+    // =========================
+
+    async function fetchData() {
+      const url = buildUrl();
+      statusEl.textContent = 'Pobieranie...';
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (!data.feeds || data.feeds.length === 0) {
+          statusEl.textContent = 'Brak danych';
+          return { x: [], y: [] };
+        }
+
+        const x = [];
+        const y = [];
+
+        data.feeds.forEach(f => {
+          if (f.field1 !== null) {
+            x.push(f.created_at);
+            y.push(parseFloat(f.field1));
+          }
+        });
+
+        // redukcja punktów dla płynności
+        const reduced = downsample(x, y, MAX_POINTS);
+
+        statusEl.textContent = `OK | punkty: ${reduced.x.length}`;
+
+        return reduced;
+
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = 'Błąd pobierania';
+        return { x: [], y: [] };
+      }
+    }
+
+    // =========================
+    // RYSOWANIE / AKTUALIZACJA
+    // =========================
+
+    async function render() {
+      const { x, y } = await fetchData();
+
+      const trace = {
+        x,
+        y,
+        mode: 'lines',
+        name: 'Temperatura',
+        line: { color: '#22c55e', width: 2 }
+      };
+
+      const layout = {
+        margin: { l: 50, r: 20, t: 30, b: 50 },
+        paper_bgcolor: '#0f172a',
+        plot_bgcolor: '#0f172a',
+        font: { color: '#e2e8f0' },
+        xaxis: {
+          title: 'Czas',
+          gridcolor: '#1f2937'
+        },
+        yaxis: {
+          title: '°C',
+          gridcolor: '#1f2937'
+        },
+        dragmode: 'pan' // domyślnie przesuwanie
+      };
+
+      Plotly.react('chart', [trace], layout, { responsive: true });
+    }
+
+    // =========================
+    // AUTO REFRESH
+    // =========================
+
+    function restartTimer() {
+      if (timer) clearInterval(timer);
+
+      if (!autoToggle.checked) return;
+
+      const intervalSec = parseInt(intervalSelect.value, 10);
+      timer = setInterval(render, intervalSec * 1000);
+    }
+
+    // =========================
+    // OBSŁUGA UI
+    // =========================
+
+    document.querySelectorAll('.topbar button[data-range]')
+      .forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.topbar button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+
+          currentRange = btn.dataset.range;
+          render();
+        });
+      });
+
+    autoToggle.addEventListener('change', restartTimer);
+    intervalSelect.addEventListener('change', restartTimer);
+
+    // =========================
+    // START
+    // =========================
+
+    render();
+    restartTimer();
+
+  </script>
+
+</body>
+</html>
