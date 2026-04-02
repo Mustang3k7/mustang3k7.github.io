@@ -1,44 +1,48 @@
 <!--
-Nazwa: Dashboard temperatury PRO z analizą
+Nazwa: Dashboard temperatury PRO z analizą, suwakiem czasu, histogramem i temperaturą Lublin
 Cel:
 - Wyświetlanie danych temperatury z ThingSpeak w formie aplikacyjnego dashboardu.
-- Pokazanie nie tylko wykresu, ale też podstawowej analizy:
-  aktualnej temperatury, minimum, maksimum, średniej, amplitudy,
-  trendu oraz prostego wskaźnika komfortu.
+- Dodanie analizy, większej liczby zakresów czasu, suwaka godzin, histogramu,
+  stałego paska narzędzi Plotly oraz porównania z temperaturą zewnętrzną w Lublinie.
 Użycie:
 - Podmień aktualny plik index.html w repozytorium GitHub Pages.
 - Uzupełnij CHANNEL_ID oraz READ_API_KEY.
 - Otwórz stronę w przeglądarce na komputerze lub telefonie.
-- Wybieraj zakres czasu i korzystaj z automatycznego odświeżania.
+- Wybieraj zakres czasu przyciskami albo suwakiem.
 Uruchomienie:
-- GitHub Pages: po zapisaniu zmian i odczekaniu chwili strona będzie dostępna pod adresem:
-  https://mustang3k7.github.io
+- GitHub Pages: po zapisaniu zmian i odczekaniu chwili strona będzie dostępna
+  pod adresem: https://mustang3k7.github.io
 - Lokalnie: można otworzyć plik index.html bezpośrednio w przeglądarce.
 Wymagania:
 - Przeglądarka z obsługą JavaScript
 - Dostęp do Internetu
 - Kanał ThingSpeak z danymi temperatury
 Wynik:
-- Interaktywny wykres temperatury
+- Interaktywny wykres temperatury z sensora
+- Druga linia z temperaturą zewnętrzną dla Lublina
+- Histogram dla aktualnie wybranego zakresu
 - Panel analityczny z podstawowymi wskaźnikami
-- Interfejs zbliżony do aplikacji
 Zatrzymanie:
 - Wyłączenie automatycznego odświeżania lub zamknięcie strony
 Uwagi:
-- Dane są tylko odczytywane z ThingSpeak, strona niczego tam nie zapisuje.
+- Dane z ThingSpeak są tylko odczytywane.
 - Dla kanału prywatnego wymagany jest READ_API_KEY.
 - Duże serie są redukowane do rozsądnej liczby punktów, aby wykres działał płynnie.
-- Wskaźnik komfortu jest uproszczony i ma charakter orientacyjny.
+- Pasek narzędzi Plotly jest stale widoczny.
+- Oś temperatury dopasowuje się automatycznie do min/max pobranych danych.
+- Gest dwóch palców na telefonie zależy częściowo od przeglądarki, dlatego
+  dodatkowo zostawiono pasek narzędzi i suwak osi czasu.
 Data: 2026-04-02
 Status: narzędzie
 
 Założenia i interpretacja działania:
-- ESP wysyła dane do ThingSpeak.
-- Ta strona pełni rolę interfejsu analitycznego.
-- Analiza jest liczona na podstawie aktualnie pobranego zakresu danych.
-- "Trend" oznacza prostą różnicę między pierwszym i ostatnim punktem w danym zakresie.
+- ESP zapisuje dane do ThingSpeak.
+- Strona pełni rolę interfejsu analitycznego.
+- Analiza liczona jest na podstawie aktualnie pobranego zakresu danych.
+- "Trend" oznacza prostą różnicę między pierwszym i ostatnim punktem.
 - "Amplituda" oznacza różnicę między maksimum i minimum.
-- "Komfort" ma być prostym wizualnym wskaźnikiem do szybkiego podglądu, a nie pomiarem medycznym.
+- Temperatura zewnętrzna dla Lublina jest pobierana z Open-Meteo:
+  bieżąca z endpointu forecast/current, a historia godzinowa z endpointu archive.
 -->
 
 <!DOCTYPE html>
@@ -52,9 +56,6 @@ Założenia i interpretacja działania:
   <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 
   <style>
-    /* ==========================================================
-       GŁÓWNE KOLORY I ZMIENNE STYLU
-       ========================================================== */
     :root {
       --bg: #0b1220;
       --bg-2: #111827;
@@ -65,14 +66,12 @@ Założenia i interpretacja działania:
       --muted: #9fb0c8;
       --accent: #4f8cff;
       --accent-2: #22c55e;
+      --accent-3: #f59e0b;
       --warn: #f59e0b;
       --danger: #ef4444;
       --shadow: rgba(0, 0, 0, 0.28);
     }
 
-    /* ==========================================================
-       BAZA
-       ========================================================== */
     * {
       box-sizing: border-box;
     }
@@ -92,17 +91,14 @@ Założenia i interpretacja działania:
       padding: 14px;
     }
 
-    /* ==========================================================
-       UKŁAD GŁÓWNY
-       ========================================================== */
     .app {
       display: grid;
-      grid-template-columns: 1.05fr 2fr;
+      grid-template-columns: 1.1fr 2fr;
       gap: 14px;
       min-height: calc(100vh - 28px);
     }
 
-    @media (max-width: 1100px) {
+    @media (max-width: 1180px) {
       .app {
         grid-template-columns: 1fr;
       }
@@ -115,9 +111,6 @@ Założenia i interpretacja działania:
       box-shadow: 0 14px 34px var(--shadow);
     }
 
-    /* ==========================================================
-       LEWA KOLUMNA
-       ========================================================== */
     .sidebar {
       display: grid;
       gap: 14px;
@@ -136,16 +129,36 @@ Założenia i interpretacja działania:
       margin-bottom: 10px;
     }
 
+    .temp-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .temp-block {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .temp-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
     .current-temp-row {
       display: flex;
       align-items: baseline;
       gap: 10px;
-      margin-bottom: 8px;
       flex-wrap: wrap;
     }
 
     .current-temp {
-      font-size: clamp(54px, 8vw, 78px);
+      font-size: clamp(42px, 7vw, 72px);
       line-height: 0.95;
       font-weight: 800;
       letter-spacing: -0.03em;
@@ -162,6 +175,7 @@ Założenia i interpretacja działania:
     .last-time {
       color: var(--muted);
       font-size: 13px;
+      margin-top: 8px;
     }
 
     .comfort-box {
@@ -232,12 +246,9 @@ Założenia i interpretacja działania:
       font-size: 12px;
     }
 
-    /* ==========================================================
-       PRAWA KOLUMNA
-       ========================================================== */
     .main {
       display: grid;
-      grid-template-rows: auto 1fr;
+      grid-template-rows: auto auto auto 1fr auto;
       gap: 14px;
       min-height: 0;
     }
@@ -291,7 +302,37 @@ Założenia i interpretacja działania:
       white-space: nowrap;
     }
 
-    .chart-card {
+    .slider-card {
+      padding: 14px 16px;
+    }
+
+    .slider-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .slider-label {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .slider-value {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .range-slider {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .chart-card,
+    .hist-card {
       padding: 12px 12px 4px 12px;
       display: grid;
       grid-template-rows: auto 1fr;
@@ -320,18 +361,15 @@ Założenia i interpretacja działania:
     #chart {
       width: 100%;
       min-height: 420px;
-      height: calc(100vh - 220px);
+      height: 460px;
     }
 
-    @media (max-width: 1100px) {
-      #chart {
-        height: 480px;
-      }
+    #histogram {
+      width: 100%;
+      min-height: 260px;
+      height: 300px;
     }
 
-    /* ==========================================================
-       DROBNE AKCENTY KOLORÓW
-       ========================================================== */
     .up { color: var(--warn); }
     .down { color: var(--accent-2); }
     .flat { color: var(--muted); }
@@ -347,15 +385,28 @@ Założenia i interpretacja działania:
       <section class="card hero">
         <div class="eyebrow">Dashboard temperatury</div>
 
-        <div class="current-temp-row">
-          <div id="currentTemp" class="current-temp">--.--</div>
-          <div class="current-unit">°C</div>
+        <div class="temp-grid">
+          <div class="temp-block">
+            <div class="temp-label">Sensor</div>
+            <div class="current-temp-row">
+              <div id="currentTemp" class="current-temp">--.--</div>
+              <div class="current-unit">°C</div>
+            </div>
+            <div id="lastTime" class="last-time">Ostatni punkt: —</div>
+          </div>
+
+          <div class="temp-block">
+            <div class="temp-label">Lublin na zewnątrz</div>
+            <div class="current-temp-row">
+              <div id="outsideTemp" class="current-temp" style="font-size: clamp(32px, 5vw, 54px);">--.--</div>
+              <div class="current-unit">°C</div>
+            </div>
+            <div id="outsideInfo" class="last-time">Dane zewnętrzne: —</div>
+          </div>
         </div>
 
-        <div id="lastTime" class="last-time">Ostatni punkt: —</div>
-
         <div class="comfort-box">
-          <div class="comfort-title">Ocena zakresu</div>
+          <div class="comfort-title">Ocena warunków</div>
           <div id="comfortValue" class="comfort-value">Brak danych</div>
           <div id="comfortSub" class="comfort-sub">Panel pokaże orientacyjną ocenę po pobraniu danych.</div>
         </div>
@@ -401,16 +452,18 @@ Założenia i interpretacja działania:
     </div>
 
     <!-- ======================================================
-         PRAWA KOLUMNA: KONTROLA I WYKRES
+         PRAWA KOLUMNA: KONTROLA I WYKRESY
          ====================================================== -->
     <div class="main">
       <section class="card toolbar">
         <div class="toolbar-left">
-          <button class="btn active" data-range="15m">15 min</button>
-          <button class="btn" data-range="1h">1 h</button>
-          <button class="btn" data-range="6h">6 h</button>
-          <button class="btn" data-range="24h">24 h</button>
-          <button class="btn" data-range="7d">7 dni</button>
+          <button class="btn active" data-hours="1">1 h</button>
+          <button class="btn" data-hours="3">3 h</button>
+          <button class="btn" data-hours="6">6 h</button>
+          <button class="btn" data-hours="12">12 h</button>
+          <button class="btn" data-hours="24">24 h</button>
+          <button class="btn" data-hours="72">3 dni</button>
+          <button class="btn" data-hours="168">7 dni</button>
         </div>
 
         <div class="toolbar-right">
@@ -431,15 +484,34 @@ Założenia i interpretacja działania:
         </div>
       </section>
 
+      <section class="card slider-card">
+        <div class="slider-top">
+          <div class="slider-label">Zakres czasu suwakiem</div>
+          <div id="sliderHoursValue" class="slider-value">1 h</div>
+        </div>
+        <input id="hoursSlider" class="range-slider" type="range" min="1" max="168" step="1" value="1" />
+      </section>
+
       <section class="card chart-card">
         <div class="chart-head">
           <div>
             <div class="chart-title">Wykres temperatury</div>
-            <div class="chart-subtitle">Przesuwaj, powiększaj, analizuj zakres czasu</div>
+            <div class="chart-subtitle">Sensor + Lublin, stały pasek narzędzi, suwak osi czasu pod wykresem</div>
           </div>
         </div>
 
         <div id="chart"></div>
+      </section>
+
+      <section class="card hist-card">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title">Histogram temperatury sensora</div>
+            <div class="chart-subtitle">Rozkład wartości dla tego samego okresu</div>
+          </div>
+        </div>
+
+        <div id="histogram"></div>
       </section>
     </div>
   </div>
@@ -465,20 +537,28 @@ Założenia i interpretacja działania:
     // STAN APLIKACJI
     // ==========================================================
 
-    // Aktualnie wybrany zakres czasu.
-    let currentRange = "15m";
+    // Aktualnie wybrany zakres w godzinach.
+    let currentRangeHours = 1;
 
     // Id timera automatycznego odświeżania.
     let refreshTimer = null;
 
-    // Referencje do elementów interfejsu.
+    // Cache współrzędnych Lublina.
+    let lublinGeo = null;
+
+    // Referencje do elementów UI.
     const statusEl = document.getElementById("status");
     const autoToggleEl = document.getElementById("autoToggle");
     const intervalSelectEl = document.getElementById("intervalSelect");
     const refreshBtnEl = document.getElementById("refreshBtn");
+    const hoursSliderEl = document.getElementById("hoursSlider");
+    const sliderHoursValueEl = document.getElementById("sliderHoursValue");
 
     const currentTempEl = document.getElementById("currentTemp");
     const lastTimeEl = document.getElementById("lastTime");
+    const outsideTempEl = document.getElementById("outsideTemp");
+    const outsideInfoEl = document.getElementById("outsideInfo");
+
     const minTempEl = document.getElementById("minTemp");
     const maxTempEl = document.getElementById("maxTemp");
     const avgTempEl = document.getElementById("avgTemp");
@@ -495,26 +575,27 @@ Założenia i interpretacja działania:
 
     /*
     Cel:
-    - Zamiana skrótu zakresu na parametry API ThingSpeak.
+    - Sformatowanie liczby godzin do czytelnego tekstu.
     */
-    function rangeToParams(range) {
-      switch (range) {
-        case "15m": return "minutes=15";
-        case "1h":  return "minutes=60";
-        case "6h":  return "minutes=360";
-        case "24h": return "days=1";
-        case "7d":  return "days=7";
-        default:    return "minutes=15";
+    function formatHoursLabel(hours) {
+      if (hours < 24) {
+        return `${hours} h`;
       }
+
+      if (hours % 24 === 0) {
+        const days = hours / 24;
+        return days === 1 ? "1 dzień" : `${days} dni`;
+      }
+
+      return `${hours} h`;
     }
 
     /*
     Cel:
-    - Zbudowanie adresu URL do API ThingSpeak dla bieżącego zakresu.
+    - Zbudowanie URL do ThingSpeak dla aktualnego zakresu czasu.
     */
-    function buildUrl() {
-      const rangeParam = rangeToParams(currentRange);
-      let url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/fields/${FIELD}.json?${rangeParam}`;
+    function buildThingSpeakUrl() {
+      let url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/fields/${FIELD}.json?minutes=${currentRangeHours * 60}`;
 
       if (READ_API_KEY && READ_API_KEY.length > 0) {
         url += `&api_key=${READ_API_KEY}`;
@@ -527,7 +608,6 @@ Założenia i interpretacja działania:
     /*
     Cel:
     - Redukcja liczby punktów do płynnego działania wykresu.
-    - Jeśli punktów jest mało, nic nie zmienia.
     */
     function downsample(xArr, yArr, maxPoints) {
       const n = xArr.length;
@@ -563,18 +643,12 @@ Założenia i interpretacja działania:
       const amplitude = max - min;
       const trend = values[values.length - 1] - values[0];
 
-      return {
-        min,
-        max,
-        avg,
-        amplitude,
-        trend
-      };
+      return { min, max, avg, amplitude, trend };
     }
 
     /*
     Cel:
-    - Sformatowanie czasu do czytelnej lokalnej postaci.
+    - Format lokalnej daty i czasu.
     */
     function formatDateTime(isoString) {
       const date = new Date(isoString);
@@ -583,8 +657,7 @@ Założenia i interpretacja działania:
 
     /*
     Cel:
-    - Wyznaczenie uproszczonego wskaźnika komfortu dla temperatury.
-    - Jest to wskaźnik orientacyjny, nie medyczny.
+    - Ocena komfortu na podstawie bieżącej temperatury sensora.
     */
     function evaluateComfort(temp) {
       if (temp == null || Number.isNaN(temp)) {
@@ -630,7 +703,7 @@ Założenia i interpretacja działania:
 
     /*
     Cel:
-    - Sformatowanie trendu do czytelnej postaci z kierunkiem.
+    - Format trendu.
     */
     function formatTrend(trend) {
       const abs = Math.abs(trend).toFixed(3);
@@ -658,49 +731,140 @@ Założenia i interpretacja działania:
       };
     }
 
+    /*
+    Cel:
+    - Wyznaczenie daty YYYY-MM-DD dla Open-Meteo archive.
+    */
+    function formatDateForApi(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+
+    /*
+    Cel:
+    - Filtrowanie danych do dokładnego zakresu godzin.
+    */
+    function filterToLastHours(times, values, hours) {
+      const now = new Date();
+      const minTime = now.getTime() - hours * 60 * 60 * 1000;
+
+      const outX = [];
+      const outY = [];
+
+      for (let i = 0; i < times.length; i++) {
+        const t = new Date(times[i]).getTime();
+        if (t >= minTime) {
+          outX.push(times[i]);
+          outY.push(values[i]);
+        }
+      }
+
+      return { x: outX, y: outY };
+    }
+
+    /*
+    Cel:
+    - Rozwiązanie miasta Lublin do współrzędnych przez Open-Meteo geocoding API.
+    */
+    async function getLublinGeo() {
+      if (lublinGeo) {
+        return lublinGeo;
+      }
+
+      const url = "https://geocoding-api.open-meteo.com/v1/search?name=Lublin&count=1&language=pl&format=json";
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (!data.results || !data.results.length) {
+        throw new Error("Nie znaleziono Lublina w geocoding API.");
+      }
+
+      lublinGeo = {
+        latitude: data.results[0].latitude,
+        longitude: data.results[0].longitude
+      };
+
+      return lublinGeo;
+    }
+
+    /*
+    Cel:
+    - Pobranie bieżącej temperatury zewnętrznej dla Lublina.
+    */
+    async function fetchLublinCurrent() {
+      const geo = await getLublinGeo();
+
+      const url =
+        `https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}&current=temperature_2m&timezone=auto`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      return {
+        currentTemp: data?.current?.temperature_2m ?? null,
+        currentTime: data?.current?.time ?? null
+      };
+    }
+
+    /*
+    Cel:
+    - Pobranie godzinowych danych historycznych temperatury dla Lublina
+    - i odfiltrowanie ich do aktualnie wybranego zakresu.
+    */
+    async function fetchLublinHistory(hours) {
+      const geo = await getLublinGeo();
+
+      const now = new Date();
+      const start = new Date(now.getTime() - hours * 60 * 60 * 1000);
+
+      const startDate = formatDateForApi(start);
+      const endDate = formatDateForApi(now);
+
+      const url =
+        `https://archive-api.open-meteo.com/v1/archive?latitude=${geo.latitude}&longitude=${geo.longitude}&start_date=${startDate}&end_date=${endDate}&hourly=temperature_2m&timezone=auto`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      const times = data?.hourly?.time ?? [];
+      const temps = data?.hourly?.temperature_2m ?? [];
+
+      return filterToLastHours(times, temps, hours);
+    }
+
     // ==========================================================
-    // POBIERANIE DANYCH
+    // POBIERANIE DANYCH Z SENSORA
     // ==========================================================
 
     /*
     Cel:
     - Pobranie danych z ThingSpeak.
     - Odfiltrowanie pustych wartości.
-    - Redukcja liczby punktów dla płynności.
+    - Redukcja liczby punktów do wykresu.
     */
-    async function fetchData() {
-      const url = buildUrl();
-      statusEl.textContent = "Pobieranie...";
+    async function fetchSensorData() {
+      const url = buildThingSpeakUrl();
 
-      try {
-        const response = await fetch(url);
-        const data = await response.json();
+      const response = await fetch(url);
+      const data = await response.json();
 
-        if (!data.feeds || data.feeds.length === 0) {
-          statusEl.textContent = "Brak danych";
-          return { x: [], y: [] };
-        }
-
-        const rawX = [];
-        const rawY = [];
-
-        data.feeds.forEach(feed => {
-          if (feed.field1 !== null) {
-            rawX.push(feed.created_at);
-            rawY.push(parseFloat(feed.field1));
-          }
-        });
-
-        const reduced = downsample(rawX, rawY, MAX_POINTS);
-
-        statusEl.textContent = `OK | punkty: ${reduced.x.length}`;
-        return reduced;
-
-      } catch (error) {
-        console.error(error);
-        statusEl.textContent = "Błąd pobierania";
+      if (!data.feeds || data.feeds.length === 0) {
         return { x: [], y: [] };
       }
+
+      const rawX = [];
+      const rawY = [];
+
+      data.feeds.forEach(feed => {
+        if (feed.field1 !== null) {
+          rawX.push(feed.created_at);
+          rawY.push(parseFloat(feed.field1));
+        }
+      });
+
+      return downsample(rawX, rawY, MAX_POINTS);
     }
 
     // ==========================================================
@@ -711,8 +875,8 @@ Założenia i interpretacja działania:
     Cel:
     - Aktualizacja wszystkich wskaźników po lewej stronie.
     */
-    function updateAnalysisPanel(x, y) {
-      if (!x.length || !y.length) {
+    function updateAnalysisPanel(sensorX, sensorY, outsideCurrent) {
+      if (!sensorX.length || !sensorY.length) {
         currentTempEl.textContent = "--.--";
         lastTimeEl.textContent = "Ostatni punkt: —";
         minTempEl.textContent = "--";
@@ -725,52 +889,154 @@ Założenia i interpretacja działania:
         pointCountEl.textContent = "0";
         comfortValueEl.textContent = "Brak danych";
         comfortSubEl.textContent = "Panel pokaże orientacyjną ocenę po pobraniu danych.";
-        return;
+      } else {
+        const currentTemp = sensorY[sensorY.length - 1];
+        const lastTime = sensorX[sensorX.length - 1];
+        const stats = calculateStats(sensorY);
+        const comfort = evaluateComfort(currentTemp);
+        const trendInfo = formatTrend(stats.trend);
+
+        currentTempEl.textContent = currentTemp.toFixed(2);
+        lastTimeEl.textContent = `Ostatni punkt: ${formatDateTime(lastTime)}`;
+
+        minTempEl.textContent = `${stats.min.toFixed(2)} °C`;
+        maxTempEl.textContent = `${stats.max.toFixed(2)} °C`;
+        avgTempEl.textContent = `${stats.avg.toFixed(2)} °C`;
+        amplitudeEl.textContent = `${stats.amplitude.toFixed(3)} °C`;
+
+        trendValueEl.textContent = trendInfo.text;
+        trendValueEl.className = `metric-value ${trendInfo.cls}`;
+        trendNoteEl.textContent = trendInfo.note;
+
+        pointCountEl.textContent = `${sensorY.length}`;
+        comfortValueEl.textContent = comfort.label;
+        comfortSubEl.textContent = comfort.sub;
       }
 
-      const currentTemp = y[y.length - 1];
-      const lastTime = x[x.length - 1];
-      const stats = calculateStats(y);
-      const comfort = evaluateComfort(currentTemp);
-      const trendInfo = formatTrend(stats.trend);
-
-      currentTempEl.textContent = currentTemp.toFixed(2);
-      lastTimeEl.textContent = `Ostatni punkt: ${formatDateTime(lastTime)}`;
-
-      minTempEl.textContent = `${stats.min.toFixed(2)} °C`;
-      maxTempEl.textContent = `${stats.max.toFixed(2)} °C`;
-      avgTempEl.textContent = `${stats.avg.toFixed(2)} °C`;
-      amplitudeEl.textContent = `${stats.amplitude.toFixed(3)} °C`;
-
-      trendValueEl.textContent = trendInfo.text;
-      trendValueEl.className = `metric-value ${trendInfo.cls}`;
-      trendNoteEl.textContent = trendInfo.note;
-
-      pointCountEl.textContent = `${y.length}`;
-      comfortValueEl.textContent = comfort.label;
-      comfortSubEl.textContent = comfort.sub;
+      if (outsideCurrent && outsideCurrent.currentTemp != null) {
+        outsideTempEl.textContent = Number(outsideCurrent.currentTemp).toFixed(2);
+        outsideInfoEl.textContent = `Aktualizacja: ${outsideCurrent.currentTime ? formatDateTime(outsideCurrent.currentTime) : "—"}`;
+      } else {
+        outsideTempEl.textContent = "--.--";
+        outsideInfoEl.textContent = "Dane zewnętrzne: brak";
+      }
     }
 
     // ==========================================================
-    // RYSOWANIE WYKRESU
+    // RYSOWANIE WYKRESU GŁÓWNEGO
     // ==========================================================
 
     /*
     Cel:
-    - Narysowanie lub odświeżenie wykresu Plotly.
+    - Narysowanie wykresu głównego:
+    - sensor + Lublin
+    - stały pasek narzędzi
+    - range slider pod osią czasu
+    - automatyczna oś Y według min/max danych
     */
-    function renderChart(x, y) {
-      const trace = {
-        x: x,
-        y: y,
+    function renderMainChart(sensorX, sensorY, lublinX, lublinY) {
+      const traces = [];
+
+      traces.push({
+        x: sensorX,
+        y: sensorY,
         mode: "lines",
-        name: "Temperatura",
+        name: "Sensor",
         line: {
           color: "#4f8cff",
-          width: 2.4
+          width: 2.6
         },
         fill: "tozeroy",
         fillcolor: "rgba(79, 140, 255, 0.08)"
+      });
+
+      if (lublinX.length && lublinY.length) {
+        traces.push({
+          x: lublinX,
+          y: lublinY,
+          mode: "lines",
+          name: "Lublin",
+          line: {
+            color: "#f59e0b",
+            width: 2.0
+          }
+        });
+      }
+
+      const mergedValues = [...sensorY, ...lublinY].filter(v => Number.isFinite(v));
+      let yRange = undefined;
+
+      if (mergedValues.length) {
+        const minVal = Math.min(...mergedValues);
+        const maxVal = Math.max(...mergedValues);
+        const span = Math.max(maxVal - minVal, 0.3);
+        const pad = span * 0.08;
+        yRange = [minVal - pad, maxVal + pad];
+      }
+
+      const layout = {
+        margin: { l: 56, r: 18, t: 12, b: 70 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        font: { color: "#e5edf8" },
+        dragmode: "pan",
+        legend: {
+          orientation: "h",
+          y: 1.12,
+          x: 0
+        },
+        xaxis: {
+          title: "Czas",
+          gridcolor: "#243146",
+          zerolinecolor: "#243146",
+          rangeslider: {
+            visible: true,
+            bgcolor: "#101827",
+            bordercolor: "#243146",
+            thickness: 0.12
+          }
+        },
+        yaxis: {
+          title: "°C",
+          gridcolor: "#243146",
+          zerolinecolor: "#243146",
+          range: yRange,
+          autorange: false
+        },
+        showlegend: true
+      };
+
+      const config = {
+        responsive: true,
+        displayModeBar: true,
+        scrollZoom: true,
+        displaylogo: false
+      };
+
+      Plotly.react("chart", traces, layout, config);
+    }
+
+    // ==========================================================
+    // RYSOWANIE HISTOGRAMU
+    // ==========================================================
+
+    /*
+    Cel:
+    - Narysowanie histogramu temperatur sensora dla tego samego zakresu.
+    */
+    function renderHistogram(sensorY) {
+      const trace = {
+        x: sensorY,
+        type: "histogram",
+        marker: {
+          color: "#22c55e",
+          line: {
+            color: "#1a2c1f",
+            width: 1
+          }
+        },
+        opacity: 0.9,
+        nbinsx: Math.min(24, Math.max(8, Math.round(Math.sqrt(sensorY.length || 1))))
       };
 
       const layout = {
@@ -778,26 +1044,25 @@ Założenia i interpretacja działania:
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: "rgba(0,0,0,0)",
         font: { color: "#e5edf8" },
-        dragmode: "pan",
+        bargap: 0.06,
         xaxis: {
-          title: "Czas",
-          gridcolor: "#243146",
-          zerolinecolor: "#243146"
+          title: "Temperatura [°C]",
+          gridcolor: "#243146"
         },
         yaxis: {
-          title: "°C",
-          gridcolor: "#243146",
-          zerolinecolor: "#243146"
-        },
-        showlegend: false
+          title: "Liczba wystąpień",
+          gridcolor: "#243146"
+        }
       };
 
       const config = {
         responsive: true,
+        displayModeBar: true,
+        scrollZoom: true,
         displaylogo: false
       };
 
-      Plotly.react("chart", [trace], layout, config);
+      Plotly.react("histogram", [trace], layout, config);
     }
 
     // ==========================================================
@@ -809,9 +1074,24 @@ Założenia i interpretacja działania:
     - Pobranie danych i odświeżenie całego dashboardu.
     */
     async function renderDashboard() {
-      const { x, y } = await fetchData();
-      updateAnalysisPanel(x, y);
-      renderChart(x, y);
+      statusEl.textContent = "Pobieranie...";
+
+      try {
+        const [sensorData, lublinCurrent, lublinHistory] = await Promise.all([
+          fetchSensorData(),
+          fetchLublinCurrent(),
+          fetchLublinHistory(currentRangeHours)
+        ]);
+
+        updateAnalysisPanel(sensorData.x, sensorData.y, lublinCurrent);
+        renderMainChart(sensorData.x, sensorData.y, lublinHistory.x, lublinHistory.y);
+        renderHistogram(sensorData.y);
+
+        statusEl.textContent = `OK | zakres: ${formatHoursLabel(currentRangeHours)} | punkty: ${sensorData.y.length}`;
+      } catch (error) {
+        console.error(error);
+        statusEl.textContent = "Błąd pobierania";
+      }
     }
 
     // ==========================================================
@@ -841,15 +1121,49 @@ Założenia i interpretacja działania:
 
     /*
     Cel:
-    - Obsługa przycisków zakresu czasu.
+    - Ustawienie aktywnego przycisku zakresu.
     */
-    document.querySelectorAll(".btn[data-range]").forEach(button => {
+    function syncActiveRangeButtons() {
+      document.querySelectorAll(".btn[data-hours]").forEach(btn => {
+        const btnHours = parseInt(btn.dataset.hours, 10);
+        btn.classList.toggle("active", btnHours === currentRangeHours);
+      });
+    }
+
+    /*
+    Cel:
+    - Aktualizacja wartości wyświetlanej obok suwaka.
+    */
+    function syncSliderLabel() {
+      sliderHoursValueEl.textContent = formatHoursLabel(currentRangeHours);
+      hoursSliderEl.value = currentRangeHours;
+    }
+
+    /*
+    Cel:
+    - Obsługa przycisków gotowych zakresów czasu.
+    */
+    document.querySelectorAll(".btn[data-hours]").forEach(button => {
       button.addEventListener("click", () => {
-        document.querySelectorAll(".btn[data-range]").forEach(btn => btn.classList.remove("active"));
-        button.classList.add("active");
-        currentRange = button.dataset.range;
+        currentRangeHours = parseInt(button.dataset.hours, 10);
+        syncActiveRangeButtons();
+        syncSliderLabel();
         renderDashboard();
       });
+    });
+
+    /*
+    Cel:
+    - Obsługa suwaka godzin.
+    */
+    hoursSliderEl.addEventListener("input", () => {
+      currentRangeHours = parseInt(hoursSliderEl.value, 10);
+      syncActiveRangeButtons();
+      syncSliderLabel();
+    });
+
+    hoursSliderEl.addEventListener("change", () => {
+      renderDashboard();
     });
 
     /*
@@ -876,10 +1190,8 @@ Założenia i interpretacja działania:
     // START
     // ==========================================================
 
-    /*
-    Cel:
-    - Uruchomienie dashboardu po załadowaniu strony.
-    */
+    syncActiveRangeButtons();
+    syncSliderLabel();
     renderDashboard();
     restartTimer();
   </script>
