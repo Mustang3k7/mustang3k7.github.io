@@ -1,18 +1,18 @@
 <!--
-Nazwa: Dashboard temperatury PRO z analizą, zakresem dowolnym, histogramem i meteo Lublin
+Nazwa: Dashboard temperatury PRO z analizą, meteo Lublin, histogramem i zachowaniem widoku
 Cel:
 - Wyświetlanie danych temperatury z ThingSpeak w formie aplikacyjnego dashboardu.
-- Naprawa przesunięcia czasu między ThingSpeak i Open-Meteo przez ujednolicenie
-  danych do wspólnej osi czasu.
-- Obsługa zarówno szybkich zakresów czasu, jak i dokładnego wyboru przedziału od-do.
+- Naprawa przesunięcia czasu między ThingSpeak i Open-Meteo przez ujednolicenie osi czasu.
+- Zachowanie aktualnego widoku wykresu przy odświeżaniu danych bez resetu zoomu i przesunięcia.
+- Obsługa szybkich zakresów czasu, suwaka godzin i dokładnego wyboru zakresu od-do.
 - Dodanie porównania z danymi meteorologicznymi dla Lublina:
-  temperatura, wilgotność względna, wilgotność bezwzględna i ciśnienie.
-- Dodanie histogramu dla temperatury sensora i osobnego wykresu meteorologicznego.
+  temperatura, wilgotność względna, wilgotność bezwzględna, ciśnienie,
+  oraz godziny wschodu i zachodu słońca.
 Użycie:
 - Podmień aktualny plik index.html w repozytorium GitHub Pages.
-- Uzupełnij READ_API_KEY, jeśli kanał ThingSpeak jest prywatny.
-- Otwórz stronę w przeglądarce na komputerze lub telefonie.
+- Otwórz stronę w przeglądarce.
 - Wybieraj zakres czasu przyciskami, suwakiem albo polami od-do.
+- AUTO odświeża dane bez resetowania aktualnego widoku wykresu.
 Uruchomienie:
 - GitHub Pages: po zapisaniu zmian i odczekaniu chwili strona będzie dostępna
   pod adresem: https://mustang3k7.github.io
@@ -26,31 +26,34 @@ Wynik:
 - Temperatura zewnętrzna dla Lublina na tej samej osi czasu
 - Histogram temperatury sensora dla tego samego okresu
 - Osobny wykres meteo: wilgotność względna, bezwzględna i ciśnienie
-- Panel analityczny ze wskaźnikami
+- Panel analityczny ze wskaźnikami i godzinami wschodu / zachodu słońca
 Zatrzymanie:
 - Wyłączenie automatycznego odświeżania lub zamknięcie strony
 Uwagi:
 - Dane z ThingSpeak są tylko odczytywane.
-- Dla kanału prywatnego wymagany jest READ_API_KEY.
+- Dla kanału prywatnego używany jest READ_API_KEY.
 - ThingSpeak ma limit 8000 rekordów na pojedyncze żądanie, dlatego dłuższe zakresy
   są pobierane partiami w oknach dobowych.
-- Open-Meteo jest pobierane w strefie GMT, aby uniknąć rozjazdu z czasem UTC z ThingSpeak.
+- Open-Meteo dla danych godzinowych jest pobierane w GMT, aby uniknąć rozjazdu czasu
+  z UTC z ThingSpeak.
+- Wschód i zachód słońca są pobierane osobno w strefie Europe/Warsaw, czyli lokalnie
+  dla Polski.
 - Pasek narzędzi Plotly jest stale widoczny.
 - Oś temperatury dopasowuje się automatycznie do min/max pobranych danych.
-- Wilgotność bezwzględna jest liczona ze standardowego przybliżenia na podstawie
-  temperatury i wilgotności względnej.
+- Wilgotność bezwzględna jest liczona z temperatury i wilgotności względnej.
 Data: 2026-04-02
 Status: narzędzie
 
 Założenia i interpretacja działania:
 - ESP zapisuje dane do ThingSpeak.
 - Strona pełni rolę interfejsu analitycznego.
-- Analiza liczona jest na podstawie aktualnie pobranego zakresu danych.
 - ThingSpeak zwraca created_at w UTC.
-- Open-Meteo jest pobierane w GMT, a obie serie są parsowane do obiektów Date,
-  żeby przeglądarka rysowała je spójnie na jednej osi czasu.
+- Open-Meteo dla danych godzinowych jest pobierane w GMT, a obie serie są parsowane
+  do obiektów Date, aby były zgodne na jednej osi czasu.
 - Dla długich okresów ThingSpeak jest odczytywany partiami (dzień po dniu), aby
   obejść limit 8000 rekordów na pojedyncze żądanie.
+- Widok wykresu ma być zachowany przy odświeżaniu danych, a resetować się tylko
+  przy świadomej zmianie zakresu czasu przez użytkownika.
 -->
 
 <!DOCTYPE html>
@@ -60,14 +63,12 @@ Założenia i interpretacja działania:
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dashboard temperatury PRO</title>
 
-  <!-- Biblioteka Plotly do interaktywnych wykresów -->
   <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 
   <style>
     :root {
       --bg: #0b1220;
       --panel: #0f172a;
-      --panel-2: #162033;
       --border: #243146;
       --text: #e5edf8;
       --muted: #9fb0c8;
@@ -187,23 +188,23 @@ Założenia i interpretacja działania:
 
     .summary-grid {
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(8, minmax(0, 1fr));
       gap: 12px;
     }
 
-    @media (max-width: 1350px) {
+    @media (max-width: 1550px) {
       .summary-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
       }
     }
 
-    @media (max-width: 760px) {
+    @media (max-width: 820px) {
       .summary-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
-    @media (max-width: 500px) {
+    @media (max-width: 520px) {
       .summary-grid {
         grid-template-columns: 1fr;
       }
@@ -222,7 +223,7 @@ Założenia i interpretacja działania:
     }
 
     .metric-value {
-      font-size: clamp(24px, 2.6vw, 34px);
+      font-size: clamp(22px, 2.4vw, 32px);
       font-weight: 800;
       line-height: 1.05;
     }
@@ -236,12 +237,12 @@ Założenia i interpretacja działania:
 
     .main-grid {
       display: grid;
-      grid-template-columns: 1.6fr 1fr;
+      grid-template-columns: 1.65fr 1fr;
       gap: 12px;
       align-items: stretch;
     }
 
-    @media (max-width: 1100px) {
+    @media (max-width: 1180px) {
       .main-grid {
         grid-template-columns: 1fr;
       }
@@ -278,13 +279,13 @@ Założenia i interpretacja działania:
 
     #mainChart {
       width: 100%;
-      height: min(42vh, 430px);
+      height: min(41vh, 420px);
       min-height: 320px;
     }
 
     #histChart, #meteoChart {
       width: 100%;
-      height: min(24vh, 260px);
+      height: min(24vh, 255px);
       min-height: 210px;
     }
 
@@ -323,9 +324,6 @@ Założenia i interpretacja działania:
 <body>
 
   <div class="dashboard">
-    <!-- ======================================================
-         KONTROLA
-         ====================================================== -->
     <section class="card top-controls">
       <div class="row">
         <div class="row-left">
@@ -376,9 +374,6 @@ Założenia i interpretacja działania:
       </div>
     </section>
 
-    <!-- ======================================================
-         KARTY PODSUMOWANIA
-         ====================================================== -->
     <section class="summary-grid">
       <div class="card metric-card">
         <div class="metric-label">Sensor teraz</div>
@@ -411,21 +406,30 @@ Założenia i interpretacja działania:
       </div>
 
       <div class="card metric-card">
+        <div class="metric-label">Wschód słońca</div>
+        <div id="sunriseValue" class="metric-value">--:--</div>
+        <div class="metric-note">Lublin, czas lokalny Polski</div>
+      </div>
+
+      <div class="card metric-card">
+        <div class="metric-label">Zachód słońca</div>
+        <div id="sunsetValue" class="metric-value">--:--</div>
+        <div class="metric-note">Lublin, czas lokalny Polski</div>
+      </div>
+
+      <div class="card metric-card">
         <div class="metric-label">Ocena warunków</div>
         <div id="comfortValue" class="metric-value">Brak danych</div>
         <div id="comfortSub" class="metric-note">Panel pokaże orientacyjną ocenę po pobraniu danych.</div>
       </div>
     </section>
 
-    <!-- ======================================================
-         UKŁAD GŁÓWNY
-         ====================================================== -->
     <section class="main-grid">
       <section class="card chart-card">
         <div class="chart-head">
           <div>
             <div class="chart-title">Temperatura: sensor + Lublin</div>
-            <div class="chart-subtitle">Spójny czas, stały pasek narzędzi i suwak zakresu pod wykresem</div>
+            <div class="chart-subtitle">Widok nie resetuje się przy odświeżaniu danych</div>
           </div>
         </div>
         <div id="mainChart"></div>
@@ -466,9 +470,6 @@ Założenia i interpretacja działania:
       </section>
     </section>
 
-    <!-- ======================================================
-         DOLNE WYKRESY
-         ====================================================== -->
     <section class="main-grid">
       <section class="card chart-card">
         <div class="chart-head">
@@ -496,41 +497,21 @@ Założenia i interpretacja działania:
     // ==========================================================
     // KONFIGURACJA UŻYTKOWNIKA
     // ==========================================================
-
-    // ID kanału ThingSpeak.
     const CHANNEL_ID = 3317976;
-
-    // Klucz odczytu. Jeśli kanał jest publiczny, może być pusty.
     const READ_API_KEY = "5X3O3RVY2FIIBGXO";
-
-    // Numer pola, z którego odczytywana jest temperatura.
     const FIELD = 1;
-
-    // Maksymalna liczba punktów użytych do wykresu po redukcji.
     const MAX_POINTS = 1800;
-
-    // Długość pojedynczego okna pobierania z ThingSpeak.
-    // Dla zapisu co ~20 s doba daje około 4320 punktów, więc mieści się bezpiecznie
-    // w limicie 8000 rekordów na jedno żądanie.
     const THINGSPEAK_CHUNK_HOURS = 24;
 
     // ==========================================================
     // STAN APLIKACJI
     // ==========================================================
-
-    // Aktualnie wybrany szybki zakres w godzinach.
     let currentRangeHours = 1;
-
-    // Czy aktywny jest tryb zakresu ręcznego od-do.
     let useCustomRange = false;
-
-    // Id timera automatycznego odświeżania.
     let refreshTimer = null;
-
-    // Cache współrzędnych Lublina.
     let lublinGeo = null;
+    let chartUiRevision = 0;
 
-    // Referencje do elementów UI.
     const statusEl = document.getElementById("status");
     const autoToggleEl = document.getElementById("autoToggle");
     const intervalSelectEl = document.getElementById("intervalSelect");
@@ -550,6 +531,8 @@ Założenia i interpretacja działania:
     const outsideRHEl = document.getElementById("outsideRH");
     const outsideAHEl = document.getElementById("outsideAH");
     const outsidePressureEl = document.getElementById("outsidePressure");
+    const sunriseValueEl = document.getElementById("sunriseValue");
+    const sunsetValueEl = document.getElementById("sunsetValue");
 
     const minTempEl = document.getElementById("minTemp");
     const maxTempEl = document.getElementById("maxTemp");
@@ -562,30 +545,19 @@ Założenia i interpretacja działania:
     const comfortSubEl = document.getElementById("comfortSub");
 
     // ==========================================================
-    // FUNKCJE POMOCNICZE CZASU
+    // CZAS
     // ==========================================================
-
-    /*
-    Cel:
-    - Format liczby godzin do czytelnego tekstu.
-    */
     function formatHoursLabel(hours) {
       if (hours < 24) {
         return `${hours} h`;
       }
-
       if (hours % 24 === 0) {
         const days = hours / 24;
         return days === 1 ? "1 dzień" : `${days} dni`;
       }
-
       return `${hours} h`;
     }
 
-    /*
-    Cel:
-    - Format daty dla ThingSpeak: YYYY-MM-DD HH:MM:SS w UTC.
-    */
     function formatThingSpeakDateUTC(date) {
       const y = date.getUTCFullYear();
       const m = String(date.getUTCMonth() + 1).padStart(2, "0");
@@ -596,39 +568,28 @@ Założenia i interpretacja działania:
       return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
     }
 
-    /*
-    Cel:
-    - Format YYYY-MM-DD dla Open-Meteo archive API.
-    */
-    function formatDateForApi(date) {
+    function formatDateForApiUTC(date) {
       const y = date.getUTCFullYear();
       const m = String(date.getUTCMonth() + 1).padStart(2, "0");
       const d = String(date.getUTCDate()).padStart(2, "0");
       return `${y}-${m}-${d}`;
     }
 
-    /*
-    Cel:
-    - Format czasu do pola datetime-local.
-    */
     function toLocalInputValue(date) {
       const pad = n => String(n).padStart(2, "0");
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
     }
 
-    /*
-    Cel:
-    - Sformatowanie lokalnej daty i czasu do czytelnej postaci.
-    */
     function formatDateTime(dateOrString) {
       const date = dateOrString instanceof Date ? dateOrString : new Date(dateOrString);
       return date.toLocaleString("pl-PL");
     }
 
-    /*
-    Cel:
-    - Zwrócenie aktywnego zakresu czasu jako obiekty Date.
-    */
+    function formatTimePL(dateOrString) {
+      const date = dateOrString instanceof Date ? dateOrString : new Date(dateOrString);
+      return date.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
+    }
+
     function getActiveRange() {
       if (useCustomRange && startDateEl.value && endDateEl.value) {
         return {
@@ -644,16 +605,10 @@ Założenia i interpretacja działania:
     }
 
     // ==========================================================
-    // FUNKCJE POMOCNICZE DANYCH
+    // DANE
     // ==========================================================
-
-    /*
-    Cel:
-    - Redukcja liczby punktów do płynnego działania wykresu.
-    */
     function downsample(xArr, yArr, maxPoints) {
       const n = xArr.length;
-
       if (n <= maxPoints) {
         return { x: xArr, y: yArr };
       }
@@ -670,10 +625,6 @@ Założenia i interpretacja działania:
       return { x, y };
     }
 
-    /*
-    Cel:
-    - Obliczenie statystyk dla tablicy wartości.
-    */
     function calculateStats(values) {
       if (!values || values.length === 0) {
         return null;
@@ -688,10 +639,6 @@ Założenia i interpretacja działania:
       return { min, max, avg, amplitude, trend };
     }
 
-    /*
-    Cel:
-    - Ocena komfortu dla temperatury sensora.
-    */
     function evaluateComfort(temp) {
       if (temp == null || Number.isNaN(temp)) {
         return {
@@ -734,10 +681,6 @@ Założenia i interpretacja działania:
       };
     }
 
-    /*
-    Cel:
-    - Format trendu.
-    */
     function formatTrend(trend) {
       const abs = Math.abs(trend).toFixed(3);
 
@@ -764,11 +707,6 @@ Założenia i interpretacja działania:
       };
     }
 
-    /*
-    Cel:
-    - Obliczenie wilgotności bezwzględnej [g/m3]
-    - na podstawie temperatury [°C] i wilgotności względnej [%].
-    */
     function calculateAbsoluteHumidity(tempC, rhPercent) {
       if (!Number.isFinite(tempC) || !Number.isFinite(rhPercent)) {
         return null;
@@ -776,15 +714,9 @@ Założenia i interpretacja działania:
 
       const saturationVaporPressure = 6.112 * Math.exp((17.67 * tempC) / (tempC + 243.5));
       const vaporPressure = (rhPercent / 100.0) * saturationVaporPressure;
-      const absHumidity = 216.7 * (vaporPressure / (tempC + 273.15));
-
-      return absHumidity;
+      return 216.7 * (vaporPressure / (tempC + 273.15));
     }
 
-    /*
-    Cel:
-    - Deduplikacja punktów po czasie.
-    */
     function deduplicateByTime(xArr, yArr) {
       const map = new Map();
 
@@ -799,14 +731,9 @@ Założenia i interpretacja działania:
       return { x, y };
     }
 
-    /*
-    Cel:
-    - Filtrowanie danych do konkretnego zakresu czasu.
-    */
     function filterByRange(xArr, yArr, startDate, endDate) {
       const x = [];
       const y = [];
-
       const startMs = startDate.getTime();
       const endMs = endDate.getTime();
 
@@ -822,16 +749,8 @@ Założenia i interpretacja działania:
     }
 
     // ==========================================================
-    // POBIERANIE DANYCH Z THINGSPEAK
+    // THINGSPEAK
     // ==========================================================
-
-    /*
-    Cel:
-    - Pobranie danych z ThingSpeak dla dowolnego zakresu czasu.
-    - Dla długich okresów dane są pobierane w partiach dobowych, aby nie wejść
-      w limit 8000 rekordów na jedno żądanie.
-    - created_at z ThingSpeak jest w UTC, więc jest parsowane bezpośrednio do Date.
-    */
     async function fetchThingSpeakRange(startDate, endDate) {
       const allX = [];
       const allY = [];
@@ -872,13 +791,8 @@ Założenia i interpretacja działania:
     }
 
     // ==========================================================
-    // OPEN-METEO: LUBLIN
+    // OPEN-METEO
     // ==========================================================
-
-    /*
-    Cel:
-    - Rozwiązanie miasta Lublin do współrzędnych.
-    */
     async function getLublinGeo() {
       if (lublinGeo) {
         return lublinGeo;
@@ -900,11 +814,6 @@ Założenia i interpretacja działania:
       return lublinGeo;
     }
 
-    /*
-    Cel:
-    - Pobranie bieżących danych meteo dla Lublina.
-    - timezone=GMT wymusza spójny czas bazowy.
-    */
     async function fetchLublinCurrent() {
       const geo = await getLublinGeo();
 
@@ -928,17 +837,11 @@ Założenia i interpretacja działania:
       };
     }
 
-    /*
-    Cel:
-    - Pobranie historycznych, godzinowych danych meteo dla Lublina
-    - dla wybranego zakresu.
-    - timezone=GMT daje spójny czas bazowy.
-    */
     async function fetchLublinHistory(startDate, endDate) {
       const geo = await getLublinGeo();
 
-      const startDateApi = formatDateForApi(startDate);
-      const endDateApi = formatDateForApi(endDate);
+      const startDateApi = formatDateForApiUTC(startDate);
+      const endDateApi = formatDateForApiUTC(endDate);
 
       const url =
         `https://archive-api.open-meteo.com/v1/archive?latitude=${geo.latitude}&longitude=${geo.longitude}&start_date=${startDateApi}&end_date=${endDateApi}&hourly=temperature_2m,relative_humidity_2m,pressure_msl&timezone=GMT`;
@@ -982,15 +885,33 @@ Założenia i interpretacja działania:
       };
     }
 
-    // ==========================================================
-    // AKTUALIZACJA PANELU ANALITYCZNEGO
-    // ==========================================================
+    async function fetchLublinSunDaily() {
+      const geo = await getLublinGeo();
 
-    /*
-    Cel:
-    - Aktualizacja kart i statystyk po pobraniu danych.
-    */
-    function updateAnalysisPanel(sensorX, sensorY, outsideCurrent) {
+      const today = new Date();
+      const localDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const tomorrow = new Date(localDate.getTime() + 24 * 60 * 60 * 1000);
+
+      const pad = n => String(n).padStart(2, "0");
+      const startDate = `${localDate.getFullYear()}-${pad(localDate.getMonth() + 1)}-${pad(localDate.getDate())}`;
+      const endDate = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}`;
+
+      const url =
+        `https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}&daily=sunrise,sunset&timezone=Europe/Warsaw&start_date=${startDate}&end_date=${endDate}`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      return {
+        sunrise: data?.daily?.sunrise?.[0] ?? null,
+        sunset: data?.daily?.sunset?.[0] ?? null
+      };
+    }
+
+    // ==========================================================
+    // PANEL ANALITYCZNY
+    // ==========================================================
+    function updateAnalysisPanel(sensorX, sensorY, outsideCurrent, sunDaily) {
       if (!sensorX.length || !sensorY.length) {
         currentTempEl.textContent = "--.-- °C";
         lastTimeEl.textContent = "Ostatni punkt: —";
@@ -1030,7 +951,6 @@ Założenia i interpretacja działania:
       if (outsideCurrent && outsideCurrent.currentTemp != null) {
         outsideTempEl.textContent = `${Number(outsideCurrent.currentTemp).toFixed(2)} °C`;
         outsideInfoEl.textContent = `Aktualizacja: ${outsideCurrent.currentTime ? formatDateTime(outsideCurrent.currentTime) : "—"}`;
-
         outsideRHEl.textContent = outsideCurrent.currentRH != null ? `${Number(outsideCurrent.currentRH).toFixed(1)} %` : "--.-- %";
         outsideAHEl.textContent = outsideCurrent.currentAH != null ? `${Number(outsideCurrent.currentAH).toFixed(2)} g/m³` : "--.-- g/m³";
         outsidePressureEl.textContent = outsideCurrent.currentPressure != null ? `${Number(outsideCurrent.currentPressure).toFixed(1)} hPa` : "--.-- hPa";
@@ -1041,18 +961,19 @@ Założenia i interpretacja działania:
         outsideAHEl.textContent = "--.-- g/m³";
         outsidePressureEl.textContent = "--.-- hPa";
       }
+
+      if (sunDaily && sunDaily.sunrise && sunDaily.sunset) {
+        sunriseValueEl.textContent = formatTimePL(sunDaily.sunrise);
+        sunsetValueEl.textContent = formatTimePL(sunDaily.sunset);
+      } else {
+        sunriseValueEl.textContent = "--:--";
+        sunsetValueEl.textContent = "--:--";
+      }
     }
 
     // ==========================================================
-    // WYKRES GŁÓWNY
+    // WYKRESY
     // ==========================================================
-
-    /*
-    Cel:
-    - Sensor + Lublin na wspólnej osi czasu.
-    - Oś Y automatycznie dopasowana do min/max temperatur.
-    - Stały modebar i widoczny range slider.
-    */
     function renderMainChart(sensorX, sensorY, lublinHistory) {
       const traces = [
         {
@@ -1093,6 +1014,7 @@ Założenia i interpretacja działania:
         plot_bgcolor: "rgba(0,0,0,0)",
         font: { color: "#e5edf8" },
         dragmode: "pan",
+        uirevision: chartUiRevision,
         legend: {
           orientation: "h",
           y: 1.12,
@@ -1129,10 +1051,6 @@ Założenia i interpretacja działania:
       Plotly.react("mainChart", traces, layout, config);
     }
 
-    // ==========================================================
-    // HISTOGRAM
-    // ==========================================================
-
     function renderHistogram(sensorY) {
       const trace = {
         x: sensorY,
@@ -1154,6 +1072,7 @@ Założenia i interpretacja działania:
         plot_bgcolor: "rgba(0,0,0,0)",
         font: { color: "#e5edf8" },
         bargap: 0.06,
+        uirevision: chartUiRevision,
         xaxis: {
           title: "Temperatura [°C]",
           gridcolor: "#243146"
@@ -1174,15 +1093,6 @@ Założenia i interpretacja działania:
       Plotly.react("histChart", [trace], layout, config);
     }
 
-    // ==========================================================
-    // WYKRES METEO
-    // ==========================================================
-
-    /*
-    Cel:
-    - Wykres RH, AH i ciśnienia.
-    - RH i AH na lewej osi, ciśnienie na prawej.
-    */
     function renderMeteoChart(lublinHistory) {
       const traces = [];
 
@@ -1218,6 +1128,7 @@ Założenia i interpretacja działania:
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: "rgba(0,0,0,0)",
         font: { color: "#e5edf8" },
+        uirevision: chartUiRevision,
         legend: {
           orientation: "h",
           y: 1.12,
@@ -1252,24 +1163,20 @@ Założenia i interpretacja działania:
     // ==========================================================
     // GŁÓWNA AKTUALIZACJA
     // ==========================================================
-
-    /*
-    Cel:
-    - Pobranie danych i odświeżenie całego dashboardu.
-    */
     async function renderDashboard() {
       statusEl.textContent = "Pobieranie...";
 
       try {
         const range = getActiveRange();
 
-        const [sensorData, lublinCurrent, lublinHistory] = await Promise.all([
+        const [sensorData, lublinCurrent, lublinHistory, sunDaily] = await Promise.all([
           fetchThingSpeakRange(range.start, range.end),
           fetchLublinCurrent(),
-          fetchLublinHistory(range.start, range.end)
+          fetchLublinHistory(range.start, range.end),
+          fetchLublinSunDaily()
         ]);
 
-        updateAnalysisPanel(sensorData.x, sensorData.y, lublinCurrent);
+        updateAnalysisPanel(sensorData.x, sensorData.y, lublinCurrent, sunDaily);
         renderMainChart(sensorData.x, sensorData.y, lublinHistory);
         renderHistogram(sensorData.y);
         renderMeteoChart(lublinHistory);
@@ -1284,7 +1191,6 @@ Założenia i interpretacja działania:
     // ==========================================================
     // TIMER
     // ==========================================================
-
     function restartTimer() {
       if (refreshTimer) {
         clearInterval(refreshTimer);
@@ -1301,7 +1207,6 @@ Założenia i interpretacja działania:
     // ==========================================================
     // UI
     // ==========================================================
-
     function syncActiveRangeButtons() {
       document.querySelectorAll(".btn[data-hours]").forEach(btn => {
         const btnHours = parseInt(btn.dataset.hours, 10);
@@ -1315,6 +1220,7 @@ Założenia i interpretacja działania:
     }
 
     function applyQuickRange(hours) {
+      chartUiRevision++;
       useCustomRange = false;
       currentRangeHours = hours;
       syncActiveRangeButtons();
@@ -1341,6 +1247,7 @@ Założenia i interpretacja działania:
     });
 
     hoursSliderEl.addEventListener("change", () => {
+      chartUiRevision++;
       const range = getActiveRange();
       startDateEl.value = toLocalInputValue(range.start);
       endDateEl.value = toLocalInputValue(range.end);
@@ -1363,6 +1270,7 @@ Założenia i interpretacja działania:
 
       useCustomRange = true;
       syncActiveRangeButtons();
+      chartUiRevision++;
       renderDashboard();
     });
 
@@ -1377,7 +1285,6 @@ Założenia i interpretacja działania:
     // ==========================================================
     // START
     // ==========================================================
-
     applyQuickRange(1);
     restartTimer();
   </script>
