@@ -1,14 +1,18 @@
 <!--
-Nazwa: Dashboard temperatury PRO z analizą, suwakiem czasu, histogramem i temperaturą Lublin
+Nazwa: Dashboard temperatury PRO z analizą, zakresem dowolnym, histogramem i meteo Lublin
 Cel:
 - Wyświetlanie danych temperatury z ThingSpeak w formie aplikacyjnego dashboardu.
-- Dodanie analizy, większej liczby zakresów czasu, suwaka godzin, histogramu,
-  stałego paska narzędzi Plotly oraz porównania z temperaturą zewnętrzną w Lublinie.
+- Naprawa przesunięcia czasu między ThingSpeak i Open-Meteo przez ujednolicenie
+  danych do wspólnej osi czasu.
+- Obsługa zarówno szybkich zakresów czasu, jak i dokładnego wyboru przedziału od-do.
+- Dodanie porównania z danymi meteorologicznymi dla Lublina:
+  temperatura, wilgotność względna, wilgotność bezwzględna i ciśnienie.
+- Dodanie histogramu dla temperatury sensora i osobnego wykresu meteorologicznego.
 Użycie:
 - Podmień aktualny plik index.html w repozytorium GitHub Pages.
-- Uzupełnij CHANNEL_ID oraz READ_API_KEY.
+- Uzupełnij READ_API_KEY, jeśli kanał ThingSpeak jest prywatny.
 - Otwórz stronę w przeglądarce na komputerze lub telefonie.
-- Wybieraj zakres czasu przyciskami albo suwakiem.
+- Wybieraj zakres czasu przyciskami, suwakiem albo polami od-do.
 Uruchomienie:
 - GitHub Pages: po zapisaniu zmian i odczekaniu chwili strona będzie dostępna
   pod adresem: https://mustang3k7.github.io
@@ -18,20 +22,23 @@ Wymagania:
 - Dostęp do Internetu
 - Kanał ThingSpeak z danymi temperatury
 Wynik:
-- Interaktywny wykres temperatury z sensora
-- Druga linia z temperaturą zewnętrzną dla Lublina
-- Histogram dla aktualnie wybranego zakresu
-- Panel analityczny z podstawowymi wskaźnikami
+- Interaktywny wykres temperatury sensora
+- Temperatura zewnętrzna dla Lublina na tej samej osi czasu
+- Histogram temperatury sensora dla tego samego okresu
+- Osobny wykres meteo: wilgotność względna, bezwzględna i ciśnienie
+- Panel analityczny ze wskaźnikami
 Zatrzymanie:
 - Wyłączenie automatycznego odświeżania lub zamknięcie strony
 Uwagi:
 - Dane z ThingSpeak są tylko odczytywane.
 - Dla kanału prywatnego wymagany jest READ_API_KEY.
-- Duże serie są redukowane do rozsądnej liczby punktów, aby wykres działał płynnie.
+- ThingSpeak ma limit 8000 rekordów na pojedyncze żądanie, dlatego dłuższe zakresy
+  są pobierane partiami w oknach dobowych.
+- Open-Meteo jest pobierane w strefie GMT, aby uniknąć rozjazdu z czasem UTC z ThingSpeak.
 - Pasek narzędzi Plotly jest stale widoczny.
 - Oś temperatury dopasowuje się automatycznie do min/max pobranych danych.
-- Gest dwóch palców na telefonie zależy częściowo od przeglądarki, dlatego
-  dodatkowo zostawiono pasek narzędzi i suwak osi czasu.
+- Wilgotność bezwzględna jest liczona ze standardowego przybliżenia na podstawie
+  temperatury i wilgotności względnej.
 Data: 2026-04-02
 Status: narzędzie
 
@@ -39,10 +46,11 @@ Założenia i interpretacja działania:
 - ESP zapisuje dane do ThingSpeak.
 - Strona pełni rolę interfejsu analitycznego.
 - Analiza liczona jest na podstawie aktualnie pobranego zakresu danych.
-- "Trend" oznacza prostą różnicę między pierwszym i ostatnim punktem.
-- "Amplituda" oznacza różnicę między maksimum i minimum.
-- Temperatura zewnętrzna dla Lublina jest pobierana z Open-Meteo:
-  bieżąca z endpointu forecast/current, a historia godzinowa z endpointu archive.
+- ThingSpeak zwraca created_at w UTC.
+- Open-Meteo jest pobierane w GMT, a obie serie są parsowane do obiektów Date,
+  żeby przeglądarka rysowała je spójnie na jednej osi czasu.
+- Dla długich okresów ThingSpeak jest odczytywany partiami (dzień po dniu), aby
+  obejść limit 8000 rekordów na pojedyncze żądanie.
 -->
 
 <!DOCTYPE html>
@@ -58,7 +66,6 @@ Założenia i interpretacja działania:
   <style>
     :root {
       --bg: #0b1220;
-      --bg-2: #111827;
       --panel: #0f172a;
       --panel-2: #162033;
       --border: #243146;
@@ -67,6 +74,7 @@ Założenia i interpretacja działania:
       --accent: #4f8cff;
       --accent-2: #22c55e;
       --accent-3: #f59e0b;
+      --accent-4: #38bdf8;
       --warn: #f59e0b;
       --danger: #ef4444;
       --shadow: rgba(0, 0, 0, 0.28);
@@ -88,190 +96,44 @@ Założenia i interpretacja działania:
     }
 
     body {
-      padding: 14px;
+      padding: 12px;
     }
 
-    .app {
+    .dashboard {
       display: grid;
-      grid-template-columns: 1.1fr 2fr;
-      gap: 14px;
-      min-height: calc(100vh - 28px);
-    }
-
-    @media (max-width: 1180px) {
-      .app {
-        grid-template-columns: 1fr;
-      }
+      gap: 12px;
+      min-height: calc(100vh - 24px);
     }
 
     .card {
       background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(11, 18, 32, 0.98));
       border: 1px solid var(--border);
-      border-radius: 18px;
-      box-shadow: 0 14px 34px var(--shadow);
+      border-radius: 16px;
+      box-shadow: 0 12px 28px var(--shadow);
     }
 
-    .sidebar {
+    .top-controls {
+      padding: 12px;
       display: grid;
-      gap: 14px;
-      align-content: start;
-    }
-
-    .hero {
-      padding: 18px;
-    }
-
-    .eyebrow {
-      font-size: 12px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 10px;
-    }
-
-    .temp-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 12px;
-    }
-
-    .temp-block {
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 14px;
-      background: rgba(255,255,255,0.02);
-    }
-
-    .temp-label {
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-
-    .current-temp-row {
-      display: flex;
-      align-items: baseline;
       gap: 10px;
-      flex-wrap: wrap;
     }
 
-    .current-temp {
-      font-size: clamp(42px, 7vw, 72px);
-      line-height: 0.95;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      color: #f8fbff;
-      text-shadow: 0 0 20px rgba(79, 140, 255, 0.14);
-    }
-
-    .current-unit {
-      font-size: 22px;
-      color: var(--muted);
-      font-weight: 600;
-    }
-
-    .last-time {
-      color: var(--muted);
-      font-size: 13px;
-      margin-top: 8px;
-    }
-
-    .comfort-box {
-      margin-top: 16px;
-      padding: 12px 14px;
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      background: rgba(255,255,255,0.02);
-    }
-
-    .comfort-title {
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-
-    .comfort-value {
-      font-size: 20px;
-      font-weight: 700;
-    }
-
-    .comfort-sub {
-      margin-top: 6px;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.35;
-    }
-
-    .metrics {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      padding: 18px;
-    }
-
-    @media (max-width: 520px) {
-      .metrics {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .metric {
-      padding: 14px;
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-    }
-
-    .metric-label {
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .metric-value {
-      font-size: 28px;
-      font-weight: 700;
-      line-height: 1;
-    }
-
-    .metric-note {
-      margin-top: 8px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .main {
-      display: grid;
-      grid-template-rows: auto auto auto 1fr auto;
-      gap: 14px;
-      min-height: 0;
-    }
-
-    .toolbar {
-      padding: 14px;
+    .row {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
       align-items: center;
       justify-content: space-between;
     }
 
-    .toolbar-left,
-    .toolbar-right {
+    .row-left, .row-right {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
       align-items: center;
     }
 
-    .btn,
-    .select {
+    .btn, .select, .dt-input {
       border: 1px solid var(--border);
       background: #121b2c;
       color: var(--text);
@@ -279,6 +141,7 @@ Założenia i interpretacja działania:
       padding: 9px 12px;
       cursor: pointer;
       font-size: 14px;
+      min-height: 40px;
     }
 
     .btn.active {
@@ -291,9 +154,9 @@ Założenia i interpretacja działania:
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 0 4px;
       color: var(--muted);
       font-size: 14px;
+      padding: 0 4px;
     }
 
     .status {
@@ -302,27 +165,18 @@ Założenia i interpretacja działania:
       white-space: nowrap;
     }
 
-    .slider-card {
-      padding: 14px 16px;
+    .slider-wrap {
+      display: grid;
+      gap: 8px;
     }
 
-    .slider-top {
+    .slider-head {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
-      margin-bottom: 10px;
-    }
-
-    .slider-label {
-      font-size: 13px;
       color: var(--muted);
-    }
-
-    .slider-value {
-      font-size: 14px;
-      font-weight: 700;
+      font-size: 13px;
     }
 
     .range-slider {
@@ -331,12 +185,70 @@ Założenia i interpretacja działania:
       cursor: pointer;
     }
 
-    .chart-card,
-    .hist-card {
-      padding: 12px 12px 4px 12px;
+    .summary-grid {
       display: grid;
-      grid-template-rows: auto 1fr;
-      min-height: 0;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    @media (max-width: 1350px) {
+      .summary-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 760px) {
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 500px) {
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .metric-card {
+      padding: 14px;
+    }
+
+    .metric-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .metric-value {
+      font-size: clamp(24px, 2.6vw, 34px);
+      font-weight: 800;
+      line-height: 1.05;
+    }
+
+    .metric-note {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    @media (max-width: 1100px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chart-card, .side-card {
+      padding: 10px;
     }
 
     .chart-head {
@@ -349,7 +261,7 @@ Założenia i interpretacja działania:
     }
 
     .chart-title {
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 700;
     }
 
@@ -358,16 +270,49 @@ Założenia i interpretacja działania:
       font-size: 13px;
     }
 
-    #chart {
-      width: 100%;
-      min-height: 420px;
-      height: 460px;
+    .stack {
+      display: grid;
+      gap: 12px;
+      height: 100%;
     }
 
-    #histogram {
+    #mainChart {
       width: 100%;
-      min-height: 260px;
-      height: 300px;
+      height: min(42vh, 430px);
+      min-height: 320px;
+    }
+
+    #histChart, #meteoChart {
+      width: 100%;
+      height: min(24vh, 260px);
+      min-height: 210px;
+    }
+
+    .analysis-box {
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .analysis-title {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .analysis-value {
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .analysis-sub {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
     }
 
     .up { color: var(--warn); }
@@ -377,86 +322,13 @@ Założenia i interpretacja działania:
 </head>
 <body>
 
-  <div class="app">
+  <div class="dashboard">
     <!-- ======================================================
-         LEWA KOLUMNA: PANEL ANALITYCZNY
+         KONTROLA
          ====================================================== -->
-    <div class="sidebar">
-      <section class="card hero">
-        <div class="eyebrow">Dashboard temperatury</div>
-
-        <div class="temp-grid">
-          <div class="temp-block">
-            <div class="temp-label">Sensor</div>
-            <div class="current-temp-row">
-              <div id="currentTemp" class="current-temp">--.--</div>
-              <div class="current-unit">°C</div>
-            </div>
-            <div id="lastTime" class="last-time">Ostatni punkt: —</div>
-          </div>
-
-          <div class="temp-block">
-            <div class="temp-label">Lublin na zewnątrz</div>
-            <div class="current-temp-row">
-              <div id="outsideTemp" class="current-temp" style="font-size: clamp(32px, 5vw, 54px);">--.--</div>
-              <div class="current-unit">°C</div>
-            </div>
-            <div id="outsideInfo" class="last-time">Dane zewnętrzne: —</div>
-          </div>
-        </div>
-
-        <div class="comfort-box">
-          <div class="comfort-title">Ocena warunków</div>
-          <div id="comfortValue" class="comfort-value">Brak danych</div>
-          <div id="comfortSub" class="comfort-sub">Panel pokaże orientacyjną ocenę po pobraniu danych.</div>
-        </div>
-      </section>
-
-      <section class="card metrics">
-        <div class="metric">
-          <div class="metric-label">Minimum</div>
-          <div id="minTemp" class="metric-value">--</div>
-          <div class="metric-note">Najniższa wartość w wybranym zakresie</div>
-        </div>
-
-        <div class="metric">
-          <div class="metric-label">Maksimum</div>
-          <div id="maxTemp" class="metric-value">--</div>
-          <div class="metric-note">Najwyższa wartość w wybranym zakresie</div>
-        </div>
-
-        <div class="metric">
-          <div class="metric-label">Średnia</div>
-          <div id="avgTemp" class="metric-value">--</div>
-          <div class="metric-note">Średnia arytmetyczna dla zakresu</div>
-        </div>
-
-        <div class="metric">
-          <div class="metric-label">Amplituda</div>
-          <div id="amplitude" class="metric-value">--</div>
-          <div class="metric-note">Różnica maksimum i minimum</div>
-        </div>
-
-        <div class="metric">
-          <div class="metric-label">Trend</div>
-          <div id="trendValue" class="metric-value">--</div>
-          <div id="trendNote" class="metric-note">Zmiana między pierwszym i ostatnim punktem</div>
-        </div>
-
-        <div class="metric">
-          <div class="metric-label">Liczba punktów</div>
-          <div id="pointCount" class="metric-value">--</div>
-          <div class="metric-note">Punkty po przetworzeniu do wykresu</div>
-        </div>
-      </section>
-    </div>
-
-    <!-- ======================================================
-         PRAWA KOLUMNA: KONTROLA I WYKRESY
-         ====================================================== -->
-    <div class="main">
-      <section class="card toolbar">
-        <div class="toolbar-left">
+    <section class="card top-controls">
+      <div class="row">
+        <div class="row-left">
           <button class="btn active" data-hours="1">1 h</button>
           <button class="btn" data-hours="3">3 h</button>
           <button class="btn" data-hours="6">6 h</button>
@@ -466,7 +338,7 @@ Założenia i interpretacja działania:
           <button class="btn" data-hours="168">7 dni</button>
         </div>
 
-        <div class="toolbar-right">
+        <div class="row-right">
           <label class="toggle-wrap">
             <span>AUTO</span>
             <input id="autoToggle" type="checkbox" checked />
@@ -482,38 +354,142 @@ Założenia i interpretacja działania:
           <button id="refreshBtn" class="btn">Odśwież</button>
           <div id="status" class="status">Start...</div>
         </div>
-      </section>
+      </div>
 
-      <section class="card slider-card">
-        <div class="slider-top">
-          <div class="slider-label">Zakres czasu suwakiem</div>
-          <div id="sliderHoursValue" class="slider-value">1 h</div>
+      <div class="slider-wrap">
+        <div class="slider-head">
+          <div>Zakres czasu suwakiem</div>
+          <div id="sliderHoursValue">1 h</div>
         </div>
-        <input id="hoursSlider" class="range-slider" type="range" min="1" max="168" step="1" value="1" />
-      </section>
+        <input id="hoursSlider" class="range-slider" type="range" min="1" max="720" step="1" value="1" />
+      </div>
 
+      <div class="row">
+        <div class="row-left">
+          <label for="startDate">Od:</label>
+          <input id="startDate" class="dt-input" type="datetime-local" />
+          <label for="endDate">Do:</label>
+          <input id="endDate" class="dt-input" type="datetime-local" />
+          <button id="applyRangeBtn" class="btn">Zastosuj okres</button>
+          <button id="resetRangeBtn" class="btn">Wróć do szybkiego zakresu</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================
+         KARTY PODSUMOWANIA
+         ====================================================== -->
+    <section class="summary-grid">
+      <div class="card metric-card">
+        <div class="metric-label">Sensor teraz</div>
+        <div id="currentTemp" class="metric-value">--.-- °C</div>
+        <div id="lastTime" class="metric-note">Ostatni punkt: —</div>
+      </div>
+
+      <div class="card metric-card">
+        <div class="metric-label">Lublin teraz</div>
+        <div id="outsideTemp" class="metric-value">--.-- °C</div>
+        <div id="outsideInfo" class="metric-note">Dane zewnętrzne: —</div>
+      </div>
+
+      <div class="card metric-card">
+        <div class="metric-label">Wilgotność względna</div>
+        <div id="outsideRH" class="metric-value">--.-- %</div>
+        <div class="metric-note">Dane pogodowe dla Lublina</div>
+      </div>
+
+      <div class="card metric-card">
+        <div class="metric-label">Wilgotność bezwzględna</div>
+        <div id="outsideAH" class="metric-value">--.-- g/m³</div>
+        <div class="metric-note">Wyliczona z temperatury i RH</div>
+      </div>
+
+      <div class="card metric-card">
+        <div class="metric-label">Ciśnienie</div>
+        <div id="outsidePressure" class="metric-value">--.-- hPa</div>
+        <div class="metric-note">Ciśnienie zredukowane do poziomu morza</div>
+      </div>
+
+      <div class="card metric-card">
+        <div class="metric-label">Ocena warunków</div>
+        <div id="comfortValue" class="metric-value">Brak danych</div>
+        <div id="comfortSub" class="metric-note">Panel pokaże orientacyjną ocenę po pobraniu danych.</div>
+      </div>
+    </section>
+
+    <!-- ======================================================
+         UKŁAD GŁÓWNY
+         ====================================================== -->
+    <section class="main-grid">
       <section class="card chart-card">
         <div class="chart-head">
           <div>
-            <div class="chart-title">Wykres temperatury</div>
-            <div class="chart-subtitle">Sensor + Lublin, stały pasek narzędzi, suwak osi czasu pod wykresem</div>
+            <div class="chart-title">Temperatura: sensor + Lublin</div>
+            <div class="chart-subtitle">Spójny czas, stały pasek narzędzi i suwak zakresu pod wykresem</div>
           </div>
         </div>
-
-        <div id="chart"></div>
+        <div id="mainChart"></div>
       </section>
 
-      <section class="card hist-card">
+      <section class="card side-card">
+        <div class="stack">
+          <div class="analysis-box">
+            <div class="analysis-title">Minimum</div>
+            <div id="minTemp" class="analysis-value">--</div>
+            <div class="analysis-sub">Najniższa wartość sensora w wybranym zakresie</div>
+          </div>
+
+          <div class="analysis-box">
+            <div class="analysis-title">Maksimum</div>
+            <div id="maxTemp" class="analysis-value">--</div>
+            <div class="analysis-sub">Najwyższa wartość sensora w wybranym zakresie</div>
+          </div>
+
+          <div class="analysis-box">
+            <div class="analysis-title">Średnia / amplituda</div>
+            <div id="avgTemp" class="analysis-value">--</div>
+            <div id="amplitude" class="analysis-sub">--</div>
+          </div>
+
+          <div class="analysis-box">
+            <div class="analysis-title">Trend</div>
+            <div id="trendValue" class="analysis-value">--</div>
+            <div id="trendNote" class="analysis-sub">Brak danych do analizy.</div>
+          </div>
+
+          <div class="analysis-box">
+            <div class="analysis-title">Liczba punktów</div>
+            <div id="pointCount" class="analysis-value">--</div>
+            <div class="analysis-sub">Punkty po przetworzeniu do wykresu</div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- ======================================================
+         DOLNE WYKRESY
+         ====================================================== -->
+    <section class="main-grid">
+      <section class="card chart-card">
         <div class="chart-head">
           <div>
             <div class="chart-title">Histogram temperatury sensora</div>
             <div class="chart-subtitle">Rozkład wartości dla tego samego okresu</div>
           </div>
         </div>
-
-        <div id="histogram"></div>
+        <div id="histChart"></div>
       </section>
-    </div>
+
+      <section class="card chart-card">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title">Meteo Lublin</div>
+            <div class="chart-subtitle">Wilgotność względna, bezwzględna i ciśnienie</div>
+          </div>
+        </div>
+        <div id="meteoChart"></div>
+      </section>
+    </section>
   </div>
 
   <script>
@@ -531,14 +507,22 @@ Założenia i interpretacja działania:
     const FIELD = 1;
 
     // Maksymalna liczba punktów użytych do wykresu po redukcji.
-    const MAX_POINTS = 1600;
+    const MAX_POINTS = 1800;
+
+    // Długość pojedynczego okna pobierania z ThingSpeak.
+    // Dla zapisu co ~20 s doba daje około 4320 punktów, więc mieści się bezpiecznie
+    // w limicie 8000 rekordów na jedno żądanie.
+    const THINGSPEAK_CHUNK_HOURS = 24;
 
     // ==========================================================
     // STAN APLIKACJI
     // ==========================================================
 
-    // Aktualnie wybrany zakres w godzinach.
+    // Aktualnie wybrany szybki zakres w godzinach.
     let currentRangeHours = 1;
+
+    // Czy aktywny jest tryb zakresu ręcznego od-do.
+    let useCustomRange = false;
 
     // Id timera automatycznego odświeżania.
     let refreshTimer = null;
@@ -554,10 +538,18 @@ Założenia i interpretacja działania:
     const hoursSliderEl = document.getElementById("hoursSlider");
     const sliderHoursValueEl = document.getElementById("sliderHoursValue");
 
+    const startDateEl = document.getElementById("startDate");
+    const endDateEl = document.getElementById("endDate");
+    const applyRangeBtnEl = document.getElementById("applyRangeBtn");
+    const resetRangeBtnEl = document.getElementById("resetRangeBtn");
+
     const currentTempEl = document.getElementById("currentTemp");
     const lastTimeEl = document.getElementById("lastTime");
     const outsideTempEl = document.getElementById("outsideTemp");
     const outsideInfoEl = document.getElementById("outsideInfo");
+    const outsideRHEl = document.getElementById("outsideRH");
+    const outsideAHEl = document.getElementById("outsideAH");
+    const outsidePressureEl = document.getElementById("outsidePressure");
 
     const minTempEl = document.getElementById("minTemp");
     const maxTempEl = document.getElementById("maxTemp");
@@ -570,12 +562,12 @@ Założenia i interpretacja działania:
     const comfortSubEl = document.getElementById("comfortSub");
 
     // ==========================================================
-    // FUNKCJE POMOCNICZE
+    // FUNKCJE POMOCNICZE CZASU
     // ==========================================================
 
     /*
     Cel:
-    - Sformatowanie liczby godzin do czytelnego tekstu.
+    - Format liczby godzin do czytelnego tekstu.
     */
     function formatHoursLabel(hours) {
       if (hours < 24) {
@@ -592,18 +584,68 @@ Założenia i interpretacja działania:
 
     /*
     Cel:
-    - Zbudowanie URL do ThingSpeak dla aktualnego zakresu czasu.
+    - Format daty dla ThingSpeak: YYYY-MM-DD HH:MM:SS w UTC.
     */
-    function buildThingSpeakUrl() {
-      let url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/fields/${FIELD}.json?minutes=${currentRangeHours * 60}`;
+    function formatThingSpeakDateUTC(date) {
+      const y = date.getUTCFullYear();
+      const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+      const d = String(date.getUTCDate()).padStart(2, "0");
+      const hh = String(date.getUTCHours()).padStart(2, "0");
+      const mm = String(date.getUTCMinutes()).padStart(2, "0");
+      const ss = String(date.getUTCSeconds()).padStart(2, "0");
+      return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+    }
 
-      if (READ_API_KEY && READ_API_KEY.length > 0) {
-        url += `&api_key=${READ_API_KEY}`;
+    /*
+    Cel:
+    - Format YYYY-MM-DD dla Open-Meteo archive API.
+    */
+    function formatDateForApi(date) {
+      const y = date.getUTCFullYear();
+      const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+      const d = String(date.getUTCDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+
+    /*
+    Cel:
+    - Format czasu do pola datetime-local.
+    */
+    function toLocalInputValue(date) {
+      const pad = n => String(n).padStart(2, "0");
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
+    /*
+    Cel:
+    - Sformatowanie lokalnej daty i czasu do czytelnej postaci.
+    */
+    function formatDateTime(dateOrString) {
+      const date = dateOrString instanceof Date ? dateOrString : new Date(dateOrString);
+      return date.toLocaleString("pl-PL");
+    }
+
+    /*
+    Cel:
+    - Zwrócenie aktywnego zakresu czasu jako obiekty Date.
+    */
+    function getActiveRange() {
+      if (useCustomRange && startDateEl.value && endDateEl.value) {
+        return {
+          start: new Date(startDateEl.value),
+          end: new Date(endDateEl.value)
+        };
       }
 
-      url += `&results=8000`;
-      return url;
+      const end = new Date();
+      const start = new Date(end.getTime() - currentRangeHours * 60 * 60 * 1000);
+
+      return { start, end };
     }
+
+    // ==========================================================
+    // FUNKCJE POMOCNICZE DANYCH
+    // ==========================================================
 
     /*
     Cel:
@@ -630,7 +672,7 @@ Założenia i interpretacja działania:
 
     /*
     Cel:
-    - Obliczenie podstawowych statystyk dla tablicy liczbowej.
+    - Obliczenie statystyk dla tablicy wartości.
     */
     function calculateStats(values) {
       if (!values || values.length === 0) {
@@ -648,16 +690,7 @@ Założenia i interpretacja działania:
 
     /*
     Cel:
-    - Format lokalnej daty i czasu.
-    */
-    function formatDateTime(isoString) {
-      const date = new Date(isoString);
-      return date.toLocaleString("pl-PL");
-    }
-
-    /*
-    Cel:
-    - Ocena komfortu na podstawie bieżącej temperatury sensora.
+    - Ocena komfortu dla temperatury sensora.
     */
     function evaluateComfort(temp) {
       if (temp == null || Number.isNaN(temp)) {
@@ -733,40 +766,118 @@ Założenia i interpretacja działania:
 
     /*
     Cel:
-    - Wyznaczenie daty YYYY-MM-DD dla Open-Meteo archive.
+    - Obliczenie wilgotności bezwzględnej [g/m3]
+    - na podstawie temperatury [°C] i wilgotności względnej [%].
     */
-    function formatDateForApi(date) {
-      const y = date.getFullYear();
-      const m = String(date.getMonth() + 1).padStart(2, "0");
-      const d = String(date.getDate()).padStart(2, "0");
-      return `${y}-${m}-${d}`;
+    function calculateAbsoluteHumidity(tempC, rhPercent) {
+      if (!Number.isFinite(tempC) || !Number.isFinite(rhPercent)) {
+        return null;
+      }
+
+      const saturationVaporPressure = 6.112 * Math.exp((17.67 * tempC) / (tempC + 243.5));
+      const vaporPressure = (rhPercent / 100.0) * saturationVaporPressure;
+      const absHumidity = 216.7 * (vaporPressure / (tempC + 273.15));
+
+      return absHumidity;
     }
 
     /*
     Cel:
-    - Filtrowanie danych do dokładnego zakresu godzin.
+    - Deduplikacja punktów po czasie.
     */
-    function filterToLastHours(times, values, hours) {
-      const now = new Date();
-      const minTime = now.getTime() - hours * 60 * 60 * 1000;
+    function deduplicateByTime(xArr, yArr) {
+      const map = new Map();
 
-      const outX = [];
-      const outY = [];
+      for (let i = 0; i < xArr.length; i++) {
+        map.set(xArr[i].getTime(), yArr[i]);
+      }
 
-      for (let i = 0; i < times.length; i++) {
-        const t = new Date(times[i]).getTime();
-        if (t >= minTime) {
-          outX.push(times[i]);
-          outY.push(values[i]);
+      const times = Array.from(map.keys()).sort((a, b) => a - b);
+      const x = times.map(t => new Date(t));
+      const y = times.map(t => map.get(t));
+
+      return { x, y };
+    }
+
+    /*
+    Cel:
+    - Filtrowanie danych do konkretnego zakresu czasu.
+    */
+    function filterByRange(xArr, yArr, startDate, endDate) {
+      const x = [];
+      const y = [];
+
+      const startMs = startDate.getTime();
+      const endMs = endDate.getTime();
+
+      for (let i = 0; i < xArr.length; i++) {
+        const t = xArr[i].getTime();
+        if (t >= startMs && t <= endMs) {
+          x.push(xArr[i]);
+          y.push(yArr[i]);
         }
       }
 
-      return { x: outX, y: outY };
+      return { x, y };
     }
+
+    // ==========================================================
+    // POBIERANIE DANYCH Z THINGSPEAK
+    // ==========================================================
 
     /*
     Cel:
-    - Rozwiązanie miasta Lublin do współrzędnych przez Open-Meteo geocoding API.
+    - Pobranie danych z ThingSpeak dla dowolnego zakresu czasu.
+    - Dla długich okresów dane są pobierane w partiach dobowych, aby nie wejść
+      w limit 8000 rekordów na jedno żądanie.
+    - created_at z ThingSpeak jest w UTC, więc jest parsowane bezpośrednio do Date.
+    */
+    async function fetchThingSpeakRange(startDate, endDate) {
+      const allX = [];
+      const allY = [];
+
+      let chunkStart = new Date(startDate.getTime());
+
+      while (chunkStart < endDate) {
+        const chunkEnd = new Date(Math.min(
+          chunkStart.getTime() + THINGSPEAK_CHUNK_HOURS * 60 * 60 * 1000,
+          endDate.getTime()
+        ));
+
+        let url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/fields/${FIELD}.json?start=${encodeURIComponent(formatThingSpeakDateUTC(chunkStart))}&end=${encodeURIComponent(formatThingSpeakDateUTC(chunkEnd))}&results=8000`;
+
+        if (READ_API_KEY && READ_API_KEY.length > 0) {
+          url += `&api_key=${READ_API_KEY}`;
+        }
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.feeds && data.feeds.length) {
+          data.feeds.forEach(feed => {
+            if (feed.field1 !== null) {
+              allX.push(new Date(feed.created_at));
+              allY.push(parseFloat(feed.field1));
+            }
+          });
+        }
+
+        chunkStart = new Date(chunkEnd.getTime() + 1000);
+      }
+
+      const deduped = deduplicateByTime(allX, allY);
+      const filtered = filterByRange(deduped.x, deduped.y, startDate, endDate);
+
+      return downsample(filtered.x, filtered.y, MAX_POINTS);
+    }
+
+    // ==========================================================
+    // OPEN-METEO: LUBLIN
+    // ==========================================================
+
+    /*
+    Cel:
+    - Rozwiązanie miasta Lublin do współrzędnych.
     */
     async function getLublinGeo() {
       if (lublinGeo) {
@@ -778,7 +889,7 @@ Założenia i interpretacja działania:
       const data = await response.json();
 
       if (!data.results || !data.results.length) {
-        throw new Error("Nie znaleziono Lublina w geocoding API.");
+        throw new Error("Nie znaleziono Lublina.");
       }
 
       lublinGeo = {
@@ -791,80 +902,84 @@ Założenia i interpretacja działania:
 
     /*
     Cel:
-    - Pobranie bieżącej temperatury zewnętrznej dla Lublina.
+    - Pobranie bieżących danych meteo dla Lublina.
+    - timezone=GMT wymusza spójny czas bazowy.
     */
     async function fetchLublinCurrent() {
       const geo = await getLublinGeo();
 
       const url =
-        `https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}&current=temperature_2m&timezone=auto`;
+        `https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}&current=temperature_2m,relative_humidity_2m,pressure_msl&timezone=GMT`;
 
       const response = await fetch(url);
       const data = await response.json();
 
+      const temp = data?.current?.temperature_2m ?? null;
+      const rh = data?.current?.relative_humidity_2m ?? null;
+      const pressure = data?.current?.pressure_msl ?? null;
+      const absHumidity = calculateAbsoluteHumidity(temp, rh);
+
       return {
-        currentTemp: data?.current?.temperature_2m ?? null,
-        currentTime: data?.current?.time ?? null
+        currentTemp: temp,
+        currentRH: rh,
+        currentPressure: pressure,
+        currentAH: absHumidity,
+        currentTime: data?.current?.time ? new Date(`${data.current.time}Z`) : null
       };
     }
 
     /*
     Cel:
-    - Pobranie godzinowych danych historycznych temperatury dla Lublina
-    - i odfiltrowanie ich do aktualnie wybranego zakresu.
+    - Pobranie historycznych, godzinowych danych meteo dla Lublina
+    - dla wybranego zakresu.
+    - timezone=GMT daje spójny czas bazowy.
     */
-    async function fetchLublinHistory(hours) {
+    async function fetchLublinHistory(startDate, endDate) {
       const geo = await getLublinGeo();
 
-      const now = new Date();
-      const start = new Date(now.getTime() - hours * 60 * 60 * 1000);
-
-      const startDate = formatDateForApi(start);
-      const endDate = formatDateForApi(now);
+      const startDateApi = formatDateForApi(startDate);
+      const endDateApi = formatDateForApi(endDate);
 
       const url =
-        `https://archive-api.open-meteo.com/v1/archive?latitude=${geo.latitude}&longitude=${geo.longitude}&start_date=${startDate}&end_date=${endDate}&hourly=temperature_2m&timezone=auto`;
+        `https://archive-api.open-meteo.com/v1/archive?latitude=${geo.latitude}&longitude=${geo.longitude}&start_date=${startDateApi}&end_date=${endDateApi}&hourly=temperature_2m,relative_humidity_2m,pressure_msl&timezone=GMT`;
 
       const response = await fetch(url);
       const data = await response.json();
 
-      const times = data?.hourly?.time ?? [];
+      const times = (data?.hourly?.time ?? []).map(t => new Date(`${t}Z`));
       const temps = data?.hourly?.temperature_2m ?? [];
+      const rhs = data?.hourly?.relative_humidity_2m ?? [];
+      const pressures = data?.hourly?.pressure_msl ?? [];
+      const absHum = temps.map((t, i) => calculateAbsoluteHumidity(t, rhs[i]));
 
-      return filterToLastHours(times, temps, hours);
-    }
+      const filteredTime = [];
+      const filteredTemp = [];
+      const filteredRH = [];
+      const filteredAH = [];
+      const filteredPressure = [];
 
-    // ==========================================================
-    // POBIERANIE DANYCH Z SENSORA
-    // ==========================================================
+      const startMs = startDate.getTime();
+      const endMs = endDate.getTime();
 
-    /*
-    Cel:
-    - Pobranie danych z ThingSpeak.
-    - Odfiltrowanie pustych wartości.
-    - Redukcja liczby punktów do wykresu.
-    */
-    async function fetchSensorData() {
-      const url = buildThingSpeakUrl();
+      for (let i = 0; i < times.length; i++) {
+        const ms = times[i].getTime();
 
-      const response = await fetch(url);
-      const data = await response.json();
-
-      if (!data.feeds || data.feeds.length === 0) {
-        return { x: [], y: [] };
+        if (ms >= startMs && ms <= endMs) {
+          filteredTime.push(times[i]);
+          filteredTemp.push(temps[i]);
+          filteredRH.push(rhs[i]);
+          filteredAH.push(absHum[i]);
+          filteredPressure.push(pressures[i]);
+        }
       }
 
-      const rawX = [];
-      const rawY = [];
-
-      data.feeds.forEach(feed => {
-        if (feed.field1 !== null) {
-          rawX.push(feed.created_at);
-          rawY.push(parseFloat(feed.field1));
-        }
-      });
-
-      return downsample(rawX, rawY, MAX_POINTS);
+      return {
+        x: filteredTime,
+        temp: filteredTemp,
+        rh: filteredRH,
+        ah: filteredAH,
+        pressure: filteredPressure
+      };
     }
 
     // ==========================================================
@@ -873,39 +988,38 @@ Założenia i interpretacja działania:
 
     /*
     Cel:
-    - Aktualizacja wszystkich wskaźników po lewej stronie.
+    - Aktualizacja kart i statystyk po pobraniu danych.
     */
     function updateAnalysisPanel(sensorX, sensorY, outsideCurrent) {
       if (!sensorX.length || !sensorY.length) {
-        currentTempEl.textContent = "--.--";
+        currentTempEl.textContent = "--.-- °C";
         lastTimeEl.textContent = "Ostatni punkt: —";
         minTempEl.textContent = "--";
         maxTempEl.textContent = "--";
         avgTempEl.textContent = "--";
         amplitudeEl.textContent = "--";
         trendValueEl.textContent = "--";
-        trendValueEl.className = "metric-value";
+        trendValueEl.className = "analysis-value";
         trendNoteEl.textContent = "Brak danych do analizy.";
-        pointCountEl.textContent = "0";
+        pointCountEl.textContent = "--";
         comfortValueEl.textContent = "Brak danych";
         comfortSubEl.textContent = "Panel pokaże orientacyjną ocenę po pobraniu danych.";
       } else {
         const currentTemp = sensorY[sensorY.length - 1];
-        const lastTime = sensorX[sensorX.length - 1];
         const stats = calculateStats(sensorY);
         const comfort = evaluateComfort(currentTemp);
         const trendInfo = formatTrend(stats.trend);
 
-        currentTempEl.textContent = currentTemp.toFixed(2);
-        lastTimeEl.textContent = `Ostatni punkt: ${formatDateTime(lastTime)}`;
+        currentTempEl.textContent = `${currentTemp.toFixed(2)} °C`;
+        lastTimeEl.textContent = `Ostatni punkt: ${formatDateTime(sensorX[sensorX.length - 1])}`;
 
         minTempEl.textContent = `${stats.min.toFixed(2)} °C`;
         maxTempEl.textContent = `${stats.max.toFixed(2)} °C`;
         avgTempEl.textContent = `${stats.avg.toFixed(2)} °C`;
-        amplitudeEl.textContent = `${stats.amplitude.toFixed(3)} °C`;
+        amplitudeEl.textContent = `Amplituda: ${stats.amplitude.toFixed(3)} °C`;
 
         trendValueEl.textContent = trendInfo.text;
-        trendValueEl.className = `metric-value ${trendInfo.cls}`;
+        trendValueEl.className = `analysis-value ${trendInfo.cls}`;
         trendNoteEl.textContent = trendInfo.note;
 
         pointCountEl.textContent = `${sensorY.length}`;
@@ -914,57 +1028,56 @@ Założenia i interpretacja działania:
       }
 
       if (outsideCurrent && outsideCurrent.currentTemp != null) {
-        outsideTempEl.textContent = Number(outsideCurrent.currentTemp).toFixed(2);
+        outsideTempEl.textContent = `${Number(outsideCurrent.currentTemp).toFixed(2)} °C`;
         outsideInfoEl.textContent = `Aktualizacja: ${outsideCurrent.currentTime ? formatDateTime(outsideCurrent.currentTime) : "—"}`;
+
+        outsideRHEl.textContent = outsideCurrent.currentRH != null ? `${Number(outsideCurrent.currentRH).toFixed(1)} %` : "--.-- %";
+        outsideAHEl.textContent = outsideCurrent.currentAH != null ? `${Number(outsideCurrent.currentAH).toFixed(2)} g/m³` : "--.-- g/m³";
+        outsidePressureEl.textContent = outsideCurrent.currentPressure != null ? `${Number(outsideCurrent.currentPressure).toFixed(1)} hPa` : "--.-- hPa";
       } else {
-        outsideTempEl.textContent = "--.--";
+        outsideTempEl.textContent = "--.-- °C";
         outsideInfoEl.textContent = "Dane zewnętrzne: brak";
+        outsideRHEl.textContent = "--.-- %";
+        outsideAHEl.textContent = "--.-- g/m³";
+        outsidePressureEl.textContent = "--.-- hPa";
       }
     }
 
     // ==========================================================
-    // RYSOWANIE WYKRESU GŁÓWNEGO
+    // WYKRES GŁÓWNY
     // ==========================================================
 
     /*
     Cel:
-    - Narysowanie wykresu głównego:
-    - sensor + Lublin
-    - stały pasek narzędzi
-    - range slider pod osią czasu
-    - automatyczna oś Y według min/max danych
+    - Sensor + Lublin na wspólnej osi czasu.
+    - Oś Y automatycznie dopasowana do min/max temperatur.
+    - Stały modebar i widoczny range slider.
     */
-    function renderMainChart(sensorX, sensorY, lublinX, lublinY) {
-      const traces = [];
+    function renderMainChart(sensorX, sensorY, lublinHistory) {
+      const traces = [
+        {
+          x: sensorX,
+          y: sensorY,
+          mode: "lines",
+          name: "Sensor",
+          line: { color: "#4f8cff", width: 2.6 },
+          fill: "tozeroy",
+          fillcolor: "rgba(79, 140, 255, 0.08)"
+        }
+      ];
 
-      traces.push({
-        x: sensorX,
-        y: sensorY,
-        mode: "lines",
-        name: "Sensor",
-        line: {
-          color: "#4f8cff",
-          width: 2.6
-        },
-        fill: "tozeroy",
-        fillcolor: "rgba(79, 140, 255, 0.08)"
-      });
-
-      if (lublinX.length && lublinY.length) {
+      if (lublinHistory.x.length && lublinHistory.temp.length) {
         traces.push({
-          x: lublinX,
-          y: lublinY,
+          x: lublinHistory.x,
+          y: lublinHistory.temp,
           mode: "lines",
           name: "Lublin",
-          line: {
-            color: "#f59e0b",
-            width: 2.0
-          }
+          line: { color: "#f59e0b", width: 2.1 }
         });
       }
 
-      const mergedValues = [...sensorY, ...lublinY].filter(v => Number.isFinite(v));
-      let yRange = undefined;
+      const mergedValues = [...sensorY, ...lublinHistory.temp].filter(v => Number.isFinite(v));
+      let yRange;
 
       if (mergedValues.length) {
         const minVal = Math.min(...mergedValues);
@@ -993,15 +1106,15 @@ Założenia i interpretacja działania:
             visible: true,
             bgcolor: "#101827",
             bordercolor: "#243146",
-            thickness: 0.12
+            thickness: 0.11
           }
         },
         yaxis: {
           title: "°C",
           gridcolor: "#243146",
           zerolinecolor: "#243146",
-          range: yRange,
-          autorange: false
+          autorange: false,
+          range: yRange
         },
         showlegend: true
       };
@@ -1013,17 +1126,13 @@ Założenia i interpretacja działania:
         displaylogo: false
       };
 
-      Plotly.react("chart", traces, layout, config);
+      Plotly.react("mainChart", traces, layout, config);
     }
 
     // ==========================================================
-    // RYSOWANIE HISTOGRAMU
+    // HISTOGRAM
     // ==========================================================
 
-    /*
-    Cel:
-    - Narysowanie histogramu temperatur sensora dla tego samego zakresu.
-    */
     function renderHistogram(sensorY) {
       const trace = {
         x: sensorY,
@@ -1062,7 +1171,82 @@ Założenia i interpretacja działania:
         displaylogo: false
       };
 
-      Plotly.react("histogram", [trace], layout, config);
+      Plotly.react("histChart", [trace], layout, config);
+    }
+
+    // ==========================================================
+    // WYKRES METEO
+    // ==========================================================
+
+    /*
+    Cel:
+    - Wykres RH, AH i ciśnienia.
+    - RH i AH na lewej osi, ciśnienie na prawej.
+    */
+    function renderMeteoChart(lublinHistory) {
+      const traces = [];
+
+      if (lublinHistory.x.length) {
+        traces.push({
+          x: lublinHistory.x,
+          y: lublinHistory.rh,
+          mode: "lines",
+          name: "RH [%]",
+          line: { color: "#38bdf8", width: 2.0 }
+        });
+
+        traces.push({
+          x: lublinHistory.x,
+          y: lublinHistory.ah,
+          mode: "lines",
+          name: "AH [g/m³]",
+          line: { color: "#22c55e", width: 2.0, dash: "dot" }
+        });
+
+        traces.push({
+          x: lublinHistory.x,
+          y: lublinHistory.pressure,
+          mode: "lines",
+          name: "Ciśnienie [hPa]",
+          yaxis: "y2",
+          line: { color: "#f59e0b", width: 2.0 }
+        });
+      }
+
+      const layout = {
+        margin: { l: 56, r: 56, t: 12, b: 50 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        font: { color: "#e5edf8" },
+        legend: {
+          orientation: "h",
+          y: 1.12,
+          x: 0
+        },
+        xaxis: {
+          title: "Czas",
+          gridcolor: "#243146"
+        },
+        yaxis: {
+          title: "RH / AH",
+          gridcolor: "#243146"
+        },
+        yaxis2: {
+          title: "hPa",
+          overlaying: "y",
+          side: "right"
+        },
+        showlegend: true
+      };
+
+      const config = {
+        responsive: true,
+        displayModeBar: true,
+        scrollZoom: true,
+        displaylogo: false
+      };
+
+      Plotly.react("meteoChart", traces, layout, config);
     }
 
     // ==========================================================
@@ -1077,17 +1261,20 @@ Założenia i interpretacja działania:
       statusEl.textContent = "Pobieranie...";
 
       try {
+        const range = getActiveRange();
+
         const [sensorData, lublinCurrent, lublinHistory] = await Promise.all([
-          fetchSensorData(),
+          fetchThingSpeakRange(range.start, range.end),
           fetchLublinCurrent(),
-          fetchLublinHistory(currentRangeHours)
+          fetchLublinHistory(range.start, range.end)
         ]);
 
         updateAnalysisPanel(sensorData.x, sensorData.y, lublinCurrent);
-        renderMainChart(sensorData.x, sensorData.y, lublinHistory.x, lublinHistory.y);
+        renderMainChart(sensorData.x, sensorData.y, lublinHistory);
         renderHistogram(sensorData.y);
+        renderMeteoChart(lublinHistory);
 
-        statusEl.textContent = `OK | zakres: ${formatHoursLabel(currentRangeHours)} | punkty: ${sensorData.y.length}`;
+        statusEl.textContent = `OK | od ${formatDateTime(range.start)} do ${formatDateTime(range.end)} | punkty: ${sensorData.y.length}`;
       } catch (error) {
         console.error(error);
         statusEl.textContent = "Błąd pobierania";
@@ -1095,13 +1282,9 @@ Założenia i interpretacja działania:
     }
 
     // ==========================================================
-    // TIMER AUTO-REFRESH
+    // TIMER
     // ==========================================================
 
-    /*
-    Cel:
-    - Restart automatycznego odświeżania po zmianie ustawień.
-    */
     function restartTimer() {
       if (refreshTimer) {
         clearInterval(refreshTimer);
@@ -1116,83 +1299,86 @@ Założenia i interpretacja działania:
     }
 
     // ==========================================================
-    // OBSŁUGA UI
+    // UI
     // ==========================================================
 
-    /*
-    Cel:
-    - Ustawienie aktywnego przycisku zakresu.
-    */
     function syncActiveRangeButtons() {
       document.querySelectorAll(".btn[data-hours]").forEach(btn => {
         const btnHours = parseInt(btn.dataset.hours, 10);
-        btn.classList.toggle("active", btnHours === currentRangeHours);
+        btn.classList.toggle("active", !useCustomRange && btnHours === currentRangeHours);
       });
     }
 
-    /*
-    Cel:
-    - Aktualizacja wartości wyświetlanej obok suwaka.
-    */
     function syncSliderLabel() {
       sliderHoursValueEl.textContent = formatHoursLabel(currentRangeHours);
       hoursSliderEl.value = currentRangeHours;
     }
 
-    /*
-    Cel:
-    - Obsługa przycisków gotowych zakresów czasu.
-    */
+    function applyQuickRange(hours) {
+      useCustomRange = false;
+      currentRangeHours = hours;
+      syncActiveRangeButtons();
+      syncSliderLabel();
+
+      const range = getActiveRange();
+      startDateEl.value = toLocalInputValue(range.start);
+      endDateEl.value = toLocalInputValue(range.end);
+
+      renderDashboard();
+    }
+
     document.querySelectorAll(".btn[data-hours]").forEach(button => {
       button.addEventListener("click", () => {
-        currentRangeHours = parseInt(button.dataset.hours, 10);
-        syncActiveRangeButtons();
-        syncSliderLabel();
-        renderDashboard();
+        applyQuickRange(parseInt(button.dataset.hours, 10));
       });
     });
 
-    /*
-    Cel:
-    - Obsługa suwaka godzin.
-    */
     hoursSliderEl.addEventListener("input", () => {
+      useCustomRange = false;
       currentRangeHours = parseInt(hoursSliderEl.value, 10);
       syncActiveRangeButtons();
       syncSliderLabel();
     });
 
     hoursSliderEl.addEventListener("change", () => {
+      const range = getActiveRange();
+      startDateEl.value = toLocalInputValue(range.start);
+      endDateEl.value = toLocalInputValue(range.end);
       renderDashboard();
     });
 
-    /*
-    Cel:
-    - Obsługa przełącznika AUTO.
-    */
+    applyRangeBtnEl.addEventListener("click", () => {
+      if (!startDateEl.value || !endDateEl.value) {
+        alert("Ustaw oba pola: od i do.");
+        return;
+      }
+
+      const start = new Date(startDateEl.value);
+      const end = new Date(endDateEl.value);
+
+      if (!(start < end)) {
+        alert("Data końcowa musi być późniejsza niż początkowa.");
+        return;
+      }
+
+      useCustomRange = true;
+      syncActiveRangeButtons();
+      renderDashboard();
+    });
+
+    resetRangeBtnEl.addEventListener("click", () => {
+      applyQuickRange(currentRangeHours);
+    });
+
     autoToggleEl.addEventListener("change", restartTimer);
-
-    /*
-    Cel:
-    - Obsługa zmiany interwału automatycznego odświeżania.
-    */
     intervalSelectEl.addEventListener("change", restartTimer);
-
-    /*
-    Cel:
-    - Ręczne odświeżenie po kliknięciu przycisku.
-    */
-    refreshBtnEl.addEventListener("click", () => {
-      renderDashboard();
-    });
+    refreshBtnEl.addEventListener("click", () => renderDashboard());
 
     // ==========================================================
     // START
     // ==========================================================
 
-    syncActiveRangeButtons();
-    syncSliderLabel();
-    renderDashboard();
+    applyQuickRange(1);
     restartTimer();
   </script>
 </body>
