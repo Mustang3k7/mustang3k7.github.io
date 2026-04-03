@@ -1,10 +1,11 @@
 <!--
-Nazwa: Dashboard temperatury PRO z analizą, forecastem, overlay dni i wykresem Moliera
+Nazwa: Dashboard temperatury PRO z analizą, forecastem rozszerzonym, overlay dni i wykresem Moliera
 Cel:
 - Wyświetlanie danych temperatury z ThingSpeak w formie aplikacyjnego dashboardu.
 - Ujednolicenie czasu danych z ThingSpeak i Open-Meteo.
 - Zachowanie aktualnego widoku wykresów przy odświeżaniu danych.
-- Dodanie forecastu temperatury dla Lublina jako przerywanej linii w przyszłość.
+- Dodanie linii modelu / forecastu temperatury dla Lublina od początku wybranego zakresu
+  aż w przyszłość, aby można było porównać rozbieżności względem pomiarów.
 - Dodanie punktu rosy, statystyk dla sensora i dla Lublina, wykresu overlay dni
   oraz uproszczonego wykresu Moliera z aktualnym punktem meteo.
 Użycie:
@@ -23,7 +24,7 @@ Wymagania:
 Wynik:
 - Interaktywny wykres temperatury sensora
 - Temperatura zewnętrzna dla Lublina na tej samej osi czasu
-- Forecast temperatury dla Lublina w przyszłość
+- Linia modelu / forecastu temperatury dla Lublina od początku zakresu do przyszłości
 - Histogram temperatury sensora
 - Osobny wykres meteo: wilgotność względna, bezwzględna, punkt rosy i ciśnienie
 - Wykres overlay dni dla sensora i Lublina
@@ -46,7 +47,7 @@ Uwagi:
 - Oś temperatury dopasowuje się automatycznie do min/max pobranych danych.
 - Wilgotność bezwzględna, punkt rosy oraz linie pomocnicze na wykresie Moliera są
   liczone po stronie strony na podstawie standardowych przybliżeń psychrometrycznych.
-Data: 2026-04-02
+Data: 2026-04-03
 Status: narzędzie
 
 Założenia i interpretacja działania:
@@ -59,6 +60,9 @@ Założenia i interpretacja działania:
   obejść limit 8000 punktów na pojedyncze żądanie.
 - Widok wykresu ma być zachowany przy odświeżaniu danych, a resetować się tylko
   przy świadomej zmianie zakresu czasu przez użytkownika.
+- Linia modelu / forecastu Lublina pokazuje aktualny model pogodowy także dla części
+  przeszłej wybranego zakresu, więc służy do porównania modelu z danymi, a nie do
+  odtwarzania historycznych prognoz z dawnych dni.
 - Wykres Moliera jest uproszczonym wykresem psychrometrycznym dla ciśnienia
   zbliżonego do atmosferycznego; ma charakter praktyczny i poglądowy.
 -->
@@ -286,28 +290,29 @@ Założenia i interpretacja działania:
       grid-template-columns: 1fr 1fr;
     }
 
-    @media (max-width: 1280px) {
-      .stack {
-        grid-template-columns: 1fr 1fr;
-      }
-    }
-
     @media (max-width: 700px) {
       .stack {
         grid-template-columns: 1fr;
       }
     }
 
+    /* Wykresy podniesione wysokością */
     #mainChart {
       width: 100%;
-      height: min(46vh, 460px);
-      min-height: 330px;
+      height: min(58vh, 620px);
+      min-height: 420px;
     }
 
-    #histChart, #meteoChart, #overlayChart, #mollierChart {
+    #histChart, #meteoChart {
       width: 100%;
-      height: min(28vh, 290px);
-      min-height: 220px;
+      height: min(40vh, 430px);
+      min-height: 320px;
+    }
+
+    #overlayChart, #mollierChart {
+      width: 100%;
+      height: min(82vh, 920px);
+      min-height: 620px;
     }
 
     .analysis-box {
@@ -352,9 +357,6 @@ Założenia i interpretacja działania:
 <body>
 
   <div class="dashboard">
-    <!-- ======================================================
-         KONTROLA
-         ====================================================== -->
     <section class="card top-controls">
       <div class="row">
         <div class="row-left">
@@ -405,9 +407,6 @@ Założenia i interpretacja działania:
       </div>
     </section>
 
-    <!-- ======================================================
-         KARTY PODSUMOWANIA
-         ====================================================== -->
     <section class="summary-grid">
       <div class="card metric-card">
         <div class="metric-label">Sensor teraz</div>
@@ -470,15 +469,12 @@ Założenia i interpretacja działania:
       </div>
     </section>
 
-    <!-- ======================================================
-         GŁÓWNY WYKRES + ANALIZA
-         ====================================================== -->
     <section class="main-grid">
       <section class="card chart-card">
         <div class="chart-head">
           <div>
-            <div class="chart-title">Temperatura: sensor + Lublin + forecast</div>
-            <div class="chart-subtitle">Domyślnie pan, forecast dla Lublina jako linia przerywana</div>
+            <div class="chart-title">Temperatura: sensor + Lublin + model</div>
+            <div class="chart-subtitle">Linia modelu Lublina od początku zakresu aż w przyszłość</div>
           </div>
         </div>
         <div id="mainChart"></div>
@@ -549,9 +545,6 @@ Założenia i interpretacja działania:
       </section>
     </section>
 
-    <!-- ======================================================
-         DOLNE WYKRESY
-         ====================================================== -->
     <section class="main-grid">
       <section class="card chart-card">
         <div class="chart-head">
@@ -607,28 +600,28 @@ Założenia i interpretacja działania:
   </div>
 
   <script>
-    // ==========================================================
-    // KONFIGURACJA UŻYTKOWNIKA
-    // ==========================================================
+    // =============================================================================
+    // KONFIGURACJA
+    // =============================================================================
     const CHANNEL_ID = 3317976;
     const READ_API_KEY = "5X3O3RVY2FIIBGXO";
     const FIELD = 1;
     const MAX_POINTS = 1800;
     const THINGSPEAK_CHUNK_HOURS = 24;
-    const FORECAST_HOURS = 48;
+    const FUTURE_FORECAST_DAYS = 3;
 
-    // ==========================================================
+    // =============================================================================
     // STAN APLIKACJI
-    // ==========================================================
+    // =============================================================================
     let currentRangeHours = 1;
     let useCustomRange = false;
     let refreshTimer = null;
     let lublinGeo = null;
     let chartUiRevision = 0;
 
-    // ==========================================================
+    // =============================================================================
     // REFERENCJE DO ELEMENTÓW
-    // ==========================================================
+    // =============================================================================
     const statusEl = document.getElementById("status");
     const autoToggleEl = document.getElementById("autoToggle");
     const intervalSelectEl = document.getElementById("intervalSelect");
@@ -671,18 +664,11 @@ Założenia i interpretacja działania:
     const sensorPointCountEl = document.getElementById("sensorPointCount");
     const lublinPointCountEl = document.getElementById("lublinPointCount");
 
-    // ==========================================================
-    // CZAS
-    // ==========================================================
+    // =============================================================================
+    // FUNKCJE CZASU
+    // =============================================================================
     function formatHoursLabel(hours) {
       const days = hours / 24.0;
-      if (hours < 24) {
-        return `${hours} h (${days.toFixed(2)} dni)`;
-      }
-      if (hours % 24 === 0) {
-        const d = hours / 24;
-        return `${hours} h (${d.toFixed(2)} dni)`;
-      }
       return `${hours} h (${days.toFixed(2)} dni)`;
     }
 
@@ -728,13 +714,12 @@ Założenia i interpretacja działania:
 
       const end = new Date();
       const start = new Date(end.getTime() - currentRangeHours * 60 * 60 * 1000);
-
       return { start, end };
     }
 
-    // ==========================================================
-    // DANE I OBLICZENIA
-    // ==========================================================
+    // =============================================================================
+    // OBLICZENIA
+    // =============================================================================
     function downsample(xArr, yArr, maxPoints) {
       const n = xArr.length;
       if (n <= maxPoints) {
@@ -863,7 +848,7 @@ Założenia i interpretacja działania:
 
       const pws = 6.112 * Math.exp((17.67 * tempC) / (tempC + 243.5));
       const pw = (rhPercent / 100.0) * pws;
-      return 0.62198 * pw / (pressureHpa - pw); // kg/kg
+      return 0.62198 * pw / (pressureHpa - pw);
     }
 
     function calculateEnthalpy(tempC, humidityRatioKgKg) {
@@ -871,7 +856,7 @@ Założenia i interpretacja działania:
         return null;
       }
 
-      return 1.006 * tempC + humidityRatioKgKg * (2501 + 1.86 * tempC); // kJ/kg suchego powietrza
+      return 1.006 * tempC + humidityRatioKgKg * (2501 + 1.86 * tempC);
     }
 
     function deduplicateByTime(xArr, yArr) {
@@ -905,9 +890,9 @@ Założenia i interpretacja działania:
       return { x, y };
     }
 
-    // ==========================================================
+    // =============================================================================
     // THINGSPEAK
-    // ==========================================================
+    // =============================================================================
     async function fetchThingSpeakRange(startDate, endDate) {
       const allX = [];
       const allY = [];
@@ -946,9 +931,9 @@ Założenia i interpretacja działania:
       return downsample(filtered.x, filtered.y, MAX_POINTS);
     }
 
-    // ==========================================================
+    // =============================================================================
     // OPEN-METEO
-    // ==========================================================
+    // =============================================================================
     async function getLublinGeo() {
       if (lublinGeo) {
         return lublinGeo;
@@ -1047,11 +1032,28 @@ Założenia i interpretacja działania:
       };
     }
 
-    async function fetchLublinForecast() {
+    async function fetchLublinModelLine(startDate, endDate) {
+      /*
+      Cel:
+      - Pobranie linii modelu / forecastu Lublina nie tylko od teraz, ale od początku
+        wybranego zakresu, plus kawałek w przyszłość.
+      - To jest aktualny model pogodowy rozciągnięty na zakres wstecz + do przodu.
+      */
+
       const geo = await getLublinGeo();
+      const now = new Date();
+
+      // Ile pełnych dni wstecz potrzeba, żeby pokryć wybrany początek zakresu.
+      const msBack = Math.max(0, now.getTime() - startDate.getTime());
+      const daysBack = Math.max(1, Math.ceil(msBack / (24 * 60 * 60 * 1000)));
+
+      // Ile dni do przodu potrzeba, żeby pokryć koniec zakresu lub trochę więcej.
+      const msForward = Math.max(0, endDate.getTime() - now.getTime());
+      const daysForwardFromRange = Math.ceil(msForward / (24 * 60 * 60 * 1000));
+      const forecastDays = Math.max(FUTURE_FORECAST_DAYS, daysForwardFromRange + 1);
 
       const url =
-        `https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}&hourly=temperature_2m&forecast_hours=${FORECAST_HOURS}&timezone=GMT`;
+        `https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}&hourly=temperature_2m&past_days=${daysBack}&forecast_days=${forecastDays}&timezone=GMT`;
 
       const response = await fetch(url);
       const data = await response.json();
@@ -1085,9 +1087,9 @@ Założenia i interpretacja działania:
       };
     }
 
-    // ==========================================================
-    // ANALIZA PANELU
-    // ==========================================================
+    // =============================================================================
+    // PANEL ANALITYCZNY
+    // =============================================================================
     function setStatsBlock(prefix, stats, pointCount) {
       if (!stats) {
         document.getElementById(`${prefix}Min`).textContent = "--";
@@ -1116,7 +1118,6 @@ Założenia i interpretacja działania:
     function updateAnalysisPanel(sensorData, lublinHistory, outsideCurrent, sunDaily) {
       const sensorX = sensorData.x;
       const sensorY = sensorData.y;
-      const lublinX = lublinHistory.x;
       const lublinY = lublinHistory.temp;
 
       if (!sensorX.length || !sensorY.length) {
@@ -1167,9 +1168,9 @@ Założenia i interpretacja działania:
       pointCountsSummaryEl.textContent = `S: ${sensorY.length} | L: ${lublinY.length}`;
     }
 
-    // ==========================================================
+    // =============================================================================
     // WYKRESY
-    // ==========================================================
+    // =============================================================================
     function getCommonPlotConfig() {
       return {
         responsive: true,
@@ -1179,7 +1180,16 @@ Założenia i interpretacja działania:
       };
     }
 
-    function renderMainChart(sensorData, lublinHistory, lublinForecast) {
+    function buildRangeSliderConfig() {
+      return {
+        visible: true,
+        bgcolor: "#101827",
+        bordercolor: "#243146",
+        thickness: 0.11
+      };
+    }
+
+    function renderMainChart(sensorData, lublinHistory, lublinModel) {
       const sensorX = sensorData.x;
       const sensorY = sensorData.y;
       const lublinX = lublinHistory.x;
@@ -1207,17 +1217,17 @@ Założenia i interpretacja działania:
         });
       }
 
-      if (lublinForecast.x.length && lublinForecast.temp.length) {
+      if (lublinModel.x.length && lublinModel.temp.length) {
         traces.push({
-          x: lublinForecast.x,
-          y: lublinForecast.temp,
+          x: lublinModel.x,
+          y: lublinModel.temp,
           mode: "lines",
-          name: "Lublin forecast",
+          name: "Lublin model",
           line: { color: "#f472b6", width: 2.0, dash: "dash" }
         });
       }
 
-      const mergedValues = [...sensorY, ...lublinY, ...lublinForecast.temp].filter(v => Number.isFinite(v));
+      const mergedValues = [...sensorY, ...lublinY, ...lublinModel.temp].filter(v => Number.isFinite(v));
       let yRange;
 
       if (mergedValues.length) {
@@ -1244,13 +1254,8 @@ Założenia i interpretacja działania:
           title: "Czas",
           gridcolor: "#243146",
           zerolinecolor: "#243146",
-          rangeslider: {
-            visible: true,
-            bgcolor: "#101827",
-            bordercolor: "#243146",
-            thickness: 0.11
-          },
-          fixedrange: false
+          fixedrange: false,
+          rangeslider: buildRangeSliderConfig()
         },
         yaxis: {
           title: "°C",
@@ -1282,7 +1287,7 @@ Założenia i interpretacja działania:
       };
 
       const layout = {
-        margin: { l: 56, r: 18, t: 12, b: 50 },
+        margin: { l: 56, r: 18, t: 12, b: 70 },
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: "rgba(0,0,0,0)",
         font: { color: "#e5edf8" },
@@ -1292,7 +1297,8 @@ Założenia i interpretacja działania:
         xaxis: {
           title: "Temperatura [°C]",
           gridcolor: "#243146",
-          fixedrange: false
+          fixedrange: false,
+          rangeslider: buildRangeSliderConfig()
         },
         yaxis: {
           title: "Liczba wystąpień",
@@ -1343,7 +1349,7 @@ Założenia i interpretacja działania:
       }
 
       const layout = {
-        margin: { l: 56, r: 56, t: 12, b: 50 },
+        margin: { l: 56, r: 56, t: 12, b: 70 },
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: "rgba(0,0,0,0)",
         font: { color: "#e5edf8" },
@@ -1357,7 +1363,8 @@ Założenia i interpretacja działania:
         xaxis: {
           title: "Czas",
           gridcolor: "#243146",
-          fixedrange: false
+          fixedrange: false,
+          rangeslider: buildRangeSliderConfig()
         },
         yaxis: {
           title: "RH / AH / DP",
@@ -1378,7 +1385,6 @@ Założenia i interpretacja działania:
 
     function renderOverlayDaysChart(sensorData, lublinHistory) {
       const daysToShow = parseInt(overlayDaysSelectEl.value, 10);
-
       const traces = [];
       const palette = ["#4f8cff", "#22c55e", "#f59e0b", "#f472b6", "#38bdf8", "#a78bfa", "#ef4444"];
 
@@ -1387,10 +1393,12 @@ Założenia i interpretacja działania:
 
         for (let i = 0; i < seriesX.length; i++) {
           const d = seriesX[i];
-          const dayKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+          const dayKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
           if (!map.has(dayKey)) {
             map.set(dayKey, []);
           }
+
           map.get(dayKey).push({
             hour: d.getHours() + d.getMinutes() / 60,
             value: seriesY[i]
@@ -1401,6 +1409,7 @@ Założenia i interpretacja działania:
 
         keys.forEach((key, idx) => {
           const arr = map.get(key).sort((a, b) => a.hour - b.hour);
+
           traces.push({
             x: arr.map(p => p.hour),
             y: arr.map(p => p.value),
@@ -1420,6 +1429,7 @@ Założenia i interpretacja działania:
 
       const merged = [...sensorData.y, ...lublinHistory.temp].filter(v => Number.isFinite(v));
       let yRange;
+
       if (merged.length) {
         const minVal = Math.min(...merged);
         const maxVal = Math.max(...merged);
@@ -1429,7 +1439,7 @@ Założenia i interpretacja działania:
       }
 
       const layout = {
-        margin: { l: 56, r: 18, t: 12, b: 50 },
+        margin: { l: 56, r: 18, t: 12, b: 70 },
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: "rgba(0,0,0,0)",
         font: { color: "#e5edf8" },
@@ -1446,7 +1456,8 @@ Założenia i interpretacja działania:
           tickmode: "array",
           tickvals: [0, 3, 6, 9, 12, 15, 18, 21, 24],
           ticktext: ["0", "3", "6", "9", "12", "15", "18", "21", "24"],
-          fixedrange: false
+          fixedrange: false,
+          rangeslider: buildRangeSliderConfig()
         },
         yaxis: {
           title: "°C",
@@ -1515,7 +1526,7 @@ Założenia i interpretacja działania:
       }
 
       const layout = {
-        margin: { l: 56, r: 18, t: 12, b: 50 },
+        margin: { l: 56, r: 18, t: 12, b: 70 },
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: "rgba(0,0,0,0)",
         font: { color: "#e5edf8" },
@@ -1529,7 +1540,8 @@ Założenia i interpretacja działania:
         xaxis: {
           title: "Temperatura sucha [°C]",
           gridcolor: "#243146",
-          fixedrange: false
+          fixedrange: false,
+          rangeslider: buildRangeSliderConfig()
         },
         yaxis: {
           title: "Entalpia [kJ/kg suchego powietrza]",
@@ -1542,25 +1554,25 @@ Założenia i interpretacja działania:
       Plotly.react("mollierChart", traces, layout, getCommonPlotConfig());
     }
 
-    // ==========================================================
+    // =============================================================================
     // GŁÓWNA AKTUALIZACJA
-    // ==========================================================
+    // =============================================================================
     async function renderDashboard() {
       statusEl.textContent = "Pobieranie...";
 
       try {
         const range = getActiveRange();
 
-        const [sensorData, lublinCurrent, lublinHistory, lublinForecast, sunDaily] = await Promise.all([
+        const [sensorData, lublinCurrent, lublinHistory, lublinModel, sunDaily] = await Promise.all([
           fetchThingSpeakRange(range.start, range.end),
           fetchLublinCurrent(),
           fetchLublinHistory(range.start, range.end),
-          fetchLublinForecast(),
+          fetchLublinModelLine(range.start, range.end),
           fetchLublinSunDaily()
         ]);
 
         updateAnalysisPanel(sensorData, lublinHistory, lublinCurrent, sunDaily);
-        renderMainChart(sensorData, lublinHistory, lublinForecast);
+        renderMainChart(sensorData, lublinHistory, lublinModel);
         renderHistogram(sensorData.y);
         renderMeteoChart(lublinHistory);
         renderOverlayDaysChart(sensorData, lublinHistory);
@@ -1573,9 +1585,9 @@ Założenia i interpretacja działania:
       }
     }
 
-    // ==========================================================
+    // =============================================================================
     // TIMER
-    // ==========================================================
+    // =============================================================================
     function restartTimer() {
       if (refreshTimer) {
         clearInterval(refreshTimer);
@@ -1589,9 +1601,9 @@ Założenia i interpretacja działania:
       refreshTimer = setInterval(renderDashboard, intervalSec * 1000);
     }
 
-    // ==========================================================
+    // =============================================================================
     // UI
-    // ==========================================================
+    // =============================================================================
     function syncActiveRangeButtons() {
       document.querySelectorAll(".btn[data-hours]").forEach(btn => {
         const btnHours = parseInt(btn.dataset.hours, 10);
@@ -1672,9 +1684,9 @@ Założenia i interpretacja działania:
       renderDashboard();
     });
 
-    // ==========================================================
+    // =============================================================================
     // START
-    // ==========================================================
+    // =============================================================================
     applyQuickRange(1);
     restartTimer();
   </script>
