@@ -1190,86 +1190,103 @@ Założenia i interpretacja działania:
     }
 
     function renderMainChart(sensorData, lublinHistory, lublinModel) {
-      const sensorX = sensorData.x;
-      const sensorY = sensorData.y;
-      const lublinX = lublinHistory.x;
-      const lublinY = lublinHistory.temp;
+  const sensorX = sensorData.x;
+  const sensorY = sensorData.y;
+  const lublinX = lublinHistory.x;
+  const lublinY = lublinHistory.temp;
+  const lublinDewPoint = lublinHistory.dewPoint || [];
 
-      const traces = [
-        {
-          x: sensorX,
-          y: sensorY,
-          mode: "lines",
-          name: "Sensor",
-          line: { color: "#4f8cff", width: 2.6 },
-          fill: "tozeroy",
-          fillcolor: "rgba(79, 140, 255, 0.08)"
-        }
-      ];
-
-      if (lublinX.length && lublinY.length) {
-        traces.push({
-          x: lublinX,
-          y: lublinY,
-          mode: "lines",
-          name: "Lublin",
-          line: { color: "#f59e0b", width: 2.1 }
-        });
-      }
-
-      if (lublinModel.x.length && lublinModel.temp.length) {
-        traces.push({
-          x: lublinModel.x,
-          y: lublinModel.temp,
-          mode: "lines",
-          name: "Lublin model",
-          line: { color: "#f472b6", width: 2.0, dash: "dash" }
-        });
-      }
-
-      const mergedValues = [...sensorY, ...lublinY, ...lublinModel.temp].filter(v => Number.isFinite(v));
-      let yRange;
-
-      if (mergedValues.length) {
-        const minVal = Math.min(...mergedValues);
-        const maxVal = Math.max(...mergedValues);
-        const span = Math.max(maxVal - minVal, 0.3);
-        const pad = span * 0.08;
-        yRange = [minVal - pad, maxVal + pad];
-      }
-
-      const layout = {
-        margin: { l: 56, r: 18, t: 12, b: 70 },
-        paper_bgcolor: "rgba(0,0,0,0)",
-        plot_bgcolor: "rgba(0,0,0,0)",
-        font: { color: "#e5edf8" },
-        dragmode: "pan",
-        uirevision: chartUiRevision,
-        legend: {
-          orientation: "h",
-          y: 1.12,
-          x: 0
-        },
-        xaxis: {
-          title: "Czas",
-          gridcolor: "#243146",
-          zerolinecolor: "#243146",
-          fixedrange: false,
-          rangeslider: buildRangeSliderConfig()
-        },
-        yaxis: {
-          title: "°C",
-          gridcolor: "#243146",
-          zerolinecolor: "#243146",
-          autorange: false,
-          range: yRange,
-          fixedrange: false
-        },
-        showlegend: true
-      };
-
-      Plotly.react("mainChart", traces, layout, getCommonPlotConfig());
+  const traces = [
+    {
+      x: sensorX,
+      y: sensorY,
+      mode: "lines",
+      name: "Sensor",
+      line: { color: "#4f8cff", width: 2.6 },
+      fill: "tozeroy",
+      fillcolor: "rgba(79, 140, 255, 0.08)"
     }
+  ];
+
+  if (lublinX.length && lublinY.length) {
+    traces.push({
+      x: lublinX,
+      y: lublinY,
+      mode: "lines",
+      name: "Lublin",
+      line: { color: "#f59e0b", width: 2.1 }
+    });
+  }
+
+  if (lublinX.length && lublinDewPoint.length) {
+    traces.push({
+      x: lublinX,
+      y: lublinDewPoint,
+      mode: "lines",
+      name: "Punkt rosy",
+      line: { color: "#f472b6", width: 2.0, dash: "dot" }
+    });
+  }
+
+  if (lublinModel.x.length && lublinModel.temp.length) {
+    traces.push({
+      x: lublinModel.x,
+      y: lublinModel.temp,
+      mode: "lines",
+      name: "Lublin model",
+      line: { color: "#22c55e", width: 2.0, dash: "dash" }
+    });
+  }
+
+  const mergedValues = [
+    ...sensorY,
+    ...lublinY,
+    ...lublinDewPoint,
+    ...lublinModel.temp
+  ].filter(v => Number.isFinite(v));
+
+  let yRange;
+
+  if (mergedValues.length) {
+    const minVal = Math.min(...mergedValues);
+    const maxVal = Math.max(...mergedValues);
+    const span = Math.max(maxVal - minVal, 0.3);
+    const pad = span * 0.08;
+    yRange = [minVal - pad, maxVal + pad];
+  }
+
+  const layout = {
+    margin: { l: 56, r: 18, t: 12, b: 70 },
+    paper_bgcolor: "rgba(0,0,0,0)",
+    plot_bgcolor: "rgba(0,0,0,0)",
+    font: { color: "#e5edf8" },
+    dragmode: "pan",
+    uirevision: chartUiRevision,
+    legend: {
+      orientation: "h",
+      y: 1.12,
+      x: 0
+    },
+    xaxis: {
+      title: "Czas",
+      gridcolor: "#243146",
+      zerolinecolor: "#243146",
+      fixedrange: false,
+      rangeslider: buildRangeSliderConfig()
+    },
+    yaxis: {
+      title: "°C",
+      gridcolor: "#243146",
+      zerolinecolor: "#243146",
+      autorange: false,
+      range: yRange,
+      fixedrange: false
+    },
+    showlegend: true
+  };
+
+  Plotly.react("mainChart", traces, layout, getCommonPlotConfig());
+}
 
     function renderHistogram(sensorY) {
       const trace = {
