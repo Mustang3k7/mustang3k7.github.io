@@ -323,6 +323,12 @@ Założenia i interpretacja działania:
       min-height: 720px;
     }
 
+    #sensorOverlay3dChart {
+      width: 100%;
+      height: min(82vh, 920px);
+      min-height: 620px;
+    }
+
     .analysis-box {
       padding: 14px;
       border: 1px solid var(--border);
@@ -422,6 +428,22 @@ Założenia i interpretacja działania:
       </div>
     </section>
 
+    <section class="card chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">Sensor overlay 3D</div>
+          <div class="chart-subtitle">Tylko temperatura sensora, nakładka dobowa w 3D: X = godzina, Y = dzień, Z = temperatura</div>
+        </div>
+        <div class="overlay-controls">
+          <label for="sensorOverlay3dDaysSlider">Liczba dni:</label>
+          <input id="sensorOverlay3dDaysSlider" class="range-slider" type="range" min="1" max="1" step="1" value="1" style="width: 220px;" />
+          <div id="sensorOverlay3dDaysValue" class="status">1 dzień</div>
+        </div>
+      </div>
+      <div id="sensorOverlay3dChart"></div>
+      <div id="sensorOverlay3dInfo" class="info-line">Oczekiwanie na dane...</div>
+    </section>
+
     <section class="summary-grid">
       <div class="card metric-card"><div class="metric-label">Sensor teraz</div><div id="currentTemp" class="metric-value">--.-- °C</div><div id="lastTime" class="metric-note">Ostatni punkt: —</div></div>
       <div class="card metric-card"><div class="metric-label">Lublin teraz</div><div id="outsideTemp" class="metric-value">--.-- °C</div><div id="outsideInfo" class="metric-note">Dane zewnętrzne: —</div></div>
@@ -501,6 +523,9 @@ Założenia i interpretacja działania:
     let refreshTimer = null;
     let lublinGeo = null;
     let chartUiRevision = 0;
+    let sensor3dOverlayDays = 3;
+    let sensorAvailableDaysMax = 1;
+    let sensorOldestTimestampCache = null;
 
     const statusEl = document.getElementById("status");
     const autoToggleEl = document.getElementById("autoToggle");
@@ -527,6 +552,9 @@ Założenia i interpretacja działania:
     const comfortSubEl = document.getElementById("comfortSub");
     const pointCountsSummaryEl = document.getElementById("pointCountsSummary");
     const mollier3dInfoEl = document.getElementById("mollier3dInfo");
+    const sensorOverlay3dDaysSliderEl = document.getElementById("sensorOverlay3dDaysSlider");
+    const sensorOverlay3dDaysValueEl = document.getElementById("sensorOverlay3dDaysValue");
+    const sensorOverlay3dInfoEl = document.getElementById("sensorOverlay3dInfo");
 
     const analysisIds = {
       sensor: {
@@ -686,7 +714,7 @@ Założenia i interpretacja działania:
       return { x, y };
     }
 
-    async function fetchThingSpeakRange(startDate, endDate) {
+    async function fetchThingSpeakRange(startDate, endDate, maxPoints = MAX_POINTS) {
       const allX = [];
       const allY = [];
       let chunkStart = new Date(startDate.getTime());
@@ -710,7 +738,7 @@ Założenia i interpretacja działania:
 
       const deduped = deduplicateByTime(allX, allY);
       const filtered = filterByRange(deduped.x, deduped.y, startDate, endDate);
-      return downsample(filtered.x, filtered.y, MAX_POINTS);
+      return downsample(filtered.x, filtered.y, maxPoints);
     }
 
     async function getLublinGeo() {
@@ -819,6 +847,147 @@ Założenia i interpretacja działania:
       return { sunrise: data?.daily?.sunrise?.[0] ?? null, sunset: data?.daily?.sunset?.[0] ?? null };
     }
 
+    function formatSensorOverlayDaysText(days) {
+      return days === 1 ? "1 dzień" : `${days} dni`;
+    }
+
+    function syncSensorOverlay3dSliderUi() {
+      sensorOverlay3dDaysSliderEl.max = String(sensorAvailableDaysMax);
+      if (sensor3dOverlayDays > sensorAvailableDaysMax) {
+        sensor3dOverlayDays = sensorAvailableDaysMax;
+      }
+      if (sensor3dOverlayDays < 1) {
+        sensor3dOverlayDays = 1;
+      }
+      sensorOverlay3dDaysSliderEl.value = String(sensor3dOverlayDays);
+      sensorOverlay3dDaysValueEl.textContent = `${formatSensorOverlayDaysText(sensor3dOverlayDays)} / max ${sensorAvailableDaysMax}`;
+    }
+
+    async function fetchSensorOldestTimestampApprox() {
+      if (sensorOldestTimestampCache) return sensorOldestTimestampCache;
+
+      const ancientStart = encodeURIComponent("2000-01-01 00:00:00");
+      const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/fields/${FIELD}.json?start=${ancientStart}&results=1${READ_API_KEY ? `&api_key=${READ_API_KEY}` : ""}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data?.feeds?.length && data.feeds[0]?.created_at) {
+        sensorOldestTimestampCache = new Date(data.feeds[0].created_at);
+        return sensorOldestTimestampCache;
+      }
+
+      const fallbackUrl = `https://api.thingspeak.com/channels/${CHANNEL_ID}.json${READ_API_KEY ? `?api_key=${READ_API_KEY}` : ""}`;
+      const fallbackResponse = await fetch(fallbackUrl);
+      const fallbackData = await fallbackResponse.json();
+      sensorOldestTimestampCache = fallbackData?.created_at ? new Date(fallbackData.created_at) : new Date();
+      return sensorOldestTimestampCache;
+    }
+
+    async function fetchSensorAvailableDays() {
+      const oldest = await fetchSensorOldestTimestampApprox();
+      const now = new Date();
+      const diffDays = Math.max(1, Math.ceil((now.getTime() - oldest.getTime()) / (24 * 60 * 60 * 1000)));
+      sensorAvailableDaysMax = diffDays;
+      return diffDays;
+    }
+
+    function getSensorOverlayRange(days) {
+      const end = new Date();
+      const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+      return { start, end };
+    }
+
+    function renderSensorOverlay3D(sensorData, selectedDays) {
+      if (!sensorData.x.length || !sensorData.y.length) {
+        Plotly.react("sensorOverlay3dChart", [], {}, getCommonPlotConfig());
+        sensorOverlay3dInfoEl.textContent = "Brak danych sensora do overlay 3D.";
+        return;
+      }
+
+      const grouped = new Map();
+      for (let i = 0; i < sensorData.x.length; i++) {
+        const d = sensorData.x[i];
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push({
+          hour: d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600,
+          temp: sensorData.y[i],
+          date: d
+        });
+      }
+
+      const dayKeys = Array.from(grouped.keys()).sort().slice(-selectedDays);
+      const traces = [];
+      const palette = ["#4f8cff", "#22c55e", "#f59e0b", "#f472b6", "#38bdf8", "#a78bfa", "#ef4444", "#10b981", "#fb7185", "#eab308"];
+      const tickvals = [];
+      const ticktext = [];
+      const allTemps = [];
+
+      dayKeys.forEach((key, idx) => {
+        const points = grouped.get(key).sort((a, b) => a.hour - b.hour);
+        tickvals.push(idx);
+        ticktext.push(key);
+        allTemps.push(...points.map(p => p.temp).filter(v => Number.isFinite(v)));
+
+        traces.push({
+          type: "scatter3d",
+          mode: "lines+markers",
+          name: key,
+          x: points.map(p => p.hour),
+          y: points.map(() => idx),
+          z: points.map(p => p.temp),
+          customdata: points.map(p => [key, p.date.toLocaleTimeString("pl-PL"), p.temp]),
+          line: { width: 5, color: palette[idx % palette.length] },
+          marker: { size: 3.5, color: palette[idx % palette.length] },
+          hovertemplate: "Dzień: %{customdata[0]}<br>Godzina: %{customdata[1]}<br>Temperatura: %{customdata[2]:.2f} °C<extra>Sensor</extra>"
+        });
+      });
+
+      const zRange = computePaddedYRange(allTemps) || [0, 1];
+
+      const layout = {
+        margin: { l: 0, r: 0, t: 6, b: 0 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        font: { color: "#e5edf8" },
+        legend: { orientation: "h", y: 1.02, x: 0 },
+        scene: {
+          bgcolor: "rgba(0,0,0,0)",
+          aspectmode: "manual",
+          aspectratio: { x: 1.45, y: 1.25, z: 1.1 },
+          camera: { eye: { x: 1.45, y: 1.4, z: 0.9 } },
+          xaxis: {
+            title: "Godzina doby",
+            gridcolor: "#243146",
+            zerolinecolor: "#243146",
+            backgroundcolor: "rgba(0,0,0,0)",
+            range: [0, 24]
+          },
+          yaxis: {
+            title: "Dzień",
+            gridcolor: "#243146",
+            zerolinecolor: "#243146",
+            backgroundcolor: "rgba(0,0,0,0)",
+            tickmode: "array",
+            tickvals,
+            ticktext,
+            range: [-0.5, Math.max(dayKeys.length - 0.5, 0.5)]
+          },
+          zaxis: {
+            title: "Temperatura [°C]",
+            gridcolor: "#243146",
+            zerolinecolor: "#243146",
+            backgroundcolor: "rgba(0,0,0,0)",
+            range: zRange
+          }
+        },
+        showlegend: true
+      };
+
+      Plotly.react("sensorOverlay3dChart", traces, layout, getCommonPlotConfig());
+      sensorOverlay3dInfoEl.textContent = `Overlay 3D sensora | dni na wykresie: ${dayKeys.length} | punktów: ${sensorData.y.length} | zakres dostępnych dni: ${sensorAvailableDaysMax}`;
+    }
+
     function setStatsBlock(prefix, stats, pointCount) {
       const ids = analysisIds[prefix];
       if (!stats) {
@@ -910,6 +1079,77 @@ Założenia i interpretacja działania:
       };
     }
 
+    function computePaddedYRange(values) {
+      if (!values || values.length === 0) return null;
+      const minVal = Math.min(...values);
+      const maxVal = Math.max(...values);
+      const span = Math.max(maxVal - minVal, 0.3);
+      const pad = span * 0.08;
+      return [minVal - pad, maxVal + pad];
+    }
+
+    function getMainChartCurrentXWindow(gd) {
+      const xRange = gd?.layout?.xaxis?.range;
+      if (!xRange || xRange.length !== 2) return null;
+
+      const startMs = new Date(xRange[0]).getTime();
+      const endMs = new Date(xRange[1]).getTime();
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return null;
+
+      return [Math.min(startMs, endMs), Math.max(startMs, endMs)];
+    }
+
+    function collectVisibleMainChartYValues(gd) {
+      const xWindow = getMainChartCurrentXWindow(gd);
+      const out = [];
+
+      (gd?.data || []).forEach(trace => {
+        const isVisible = trace.visible === undefined || trace.visible === true;
+        if (!isVisible) return;
+
+        const xs = trace.x || [];
+        const ys = trace.y || [];
+        const count = Math.min(xs.length, ys.length);
+
+        for (let i = 0; i < count; i++) {
+          const y = ys[i];
+          if (!Number.isFinite(y)) continue;
+
+          if (xWindow) {
+            const xMs = new Date(xs[i]).getTime();
+            if (!Number.isFinite(xMs)) continue;
+            if (xMs < xWindow[0] || xMs > xWindow[1]) continue;
+          }
+
+          out.push(y);
+        }
+      });
+
+      return out;
+    }
+
+    function rescaleMainChartYAxisToVisibleTraces(gd) {
+      const yValues = collectVisibleMainChartYValues(gd);
+      const yRange = computePaddedYRange(yValues);
+      if (!yRange) return;
+
+      Plotly.relayout(gd, {
+        "yaxis.autorange": false,
+        "yaxis.range": yRange
+      });
+    }
+
+    function bindMainChartAutoscaleHandlers() {
+      const gd = document.getElementById("mainChart");
+      if (!gd || gd.__mainAutoscaleBound) return;
+
+      gd.__mainAutoscaleBound = true;
+
+      gd.on("plotly_restyle", () => {
+        setTimeout(() => rescaleMainChartYAxisToVisibleTraces(gd), 0);
+      });
+    }
+
     function renderMainChart(sensorData, lublinHistory, lublinModel) {
       const sensorX = sensorData.x;
       const sensorY = sensorData.y;
@@ -937,12 +1177,12 @@ Założenia i interpretacja działania:
       const mergedValues = [...sensorY, ...lublinY, ...lublinModel.temp].filter(v => Number.isFinite(v));
       let yRange;
       if (mergedValues.length) {
-        const minVal = Math.min(...mergedValues);
-        const maxVal = Math.max(...mergedValues);
-        const span = Math.max(maxVal - minVal, 0.3);
-        const pad = span * 0.08;
-        yRange = [minVal - pad, maxVal + pad];
+        yRange = computePaddedYRange(mergedValues);
       }
+
+      const sensorXRange = sensorX.length
+        ? [sensorX[0], sensorX[sensorX.length - 1]]
+        : undefined;
 
       const layout = {
         margin: { l: 56, r: 18, t: 12, b: 70 },
@@ -952,12 +1192,31 @@ Założenia i interpretacja działania:
         dragmode: "pan",
         uirevision: chartUiRevision,
         legend: { orientation: "h", y: 1.12, x: 0 },
-        xaxis: { title: "Czas", gridcolor: "#243146", zerolinecolor: "#243146", fixedrange: false, rangeslider: buildRangeSliderConfig() },
-        yaxis: { title: "°C", gridcolor: "#243146", zerolinecolor: "#243146", autorange: false, range: yRange, fixedrange: false },
+        xaxis: {
+          title: "Czas",
+          gridcolor: "#243146",
+          zerolinecolor: "#243146",
+          fixedrange: false,
+          autorange: false,
+          range: sensorXRange,
+          rangeslider: buildRangeSliderConfig()
+        },
+        yaxis: {
+          title: "°C",
+          gridcolor: "#243146",
+          zerolinecolor: "#243146",
+          autorange: false,
+          range: yRange,
+          fixedrange: false
+        },
         showlegend: true
       };
 
       Plotly.react("mainChart", traces, layout, getCommonPlotConfig());
+
+      const gd = document.getElementById("mainChart");
+      bindMainChartAutoscaleHandlers();
+      setTimeout(() => rescaleMainChartYAxisToVisibleTraces(gd), 0);
     }
 
     function renderHistogram(sensorY) {
@@ -1274,13 +1533,19 @@ Założenia i interpretacja działania:
       statusEl.textContent = "Pobieranie...";
       try {
         const range = getActiveRange();
-        const [sensorData, lublinCurrent, lublinHistory, lublinModel, sunDaily] = await Promise.all([
+        const overlayRange = getSensorOverlayRange(sensor3dOverlayDays);
+        const [sensorData, lublinCurrent, lublinHistory, lublinModel, sunDaily, sensorOverlayData, availableSensorDays] = await Promise.all([
           fetchThingSpeakRange(range.start, range.end),
           fetchLublinCurrent(),
           fetchLublinHistory(range.start, range.end),
           fetchLublinModelLine(range.start, range.end),
-          fetchLublinSunDaily()
+          fetchLublinSunDaily(),
+          fetchThingSpeakRange(overlayRange.start, overlayRange.end, 12000),
+          fetchSensorAvailableDays()
         ]);
+
+        sensorAvailableDaysMax = availableSensorDays;
+        syncSensorOverlay3dSliderUi();
 
         updateAnalysisPanel(sensorData, lublinHistory, lublinCurrent, sunDaily);
         renderMainChart(sensorData, lublinHistory, lublinModel);
@@ -1319,6 +1584,7 @@ Założenia i interpretacja działania:
         }
 
         renderMollier3D(history3dPoints, current3dPoint);
+        renderSensorOverlay3D(sensorOverlayData, sensor3dOverlayDays);
         statusEl.textContent = `OK | od ${formatDateTime(range.start)} do ${formatDateTime(range.end)} | S: ${sensorData.y.length} | L: ${lublinHistory.temp.length}`;
       } catch (error) {
         console.error(error);
@@ -1397,12 +1663,27 @@ Założenia i interpretacja działania:
     resetRangeBtnEl.addEventListener("click", () => applyQuickRange(currentRangeHours));
     autoToggleEl.addEventListener("change", restartTimer);
     intervalSelectEl.addEventListener("change", restartTimer);
-    refreshBtnEl.addEventListener("click", () => renderDashboard());
+    refreshBtnEl.addEventListener("click", () => {
+      chartUiRevision++;
+      renderDashboard();
+    });
     overlayDaysSelectEl.addEventListener("change", () => {
       chartUiRevision++;
       renderDashboard();
     });
 
+    sensorOverlay3dDaysSliderEl.addEventListener("input", () => {
+      sensor3dOverlayDays = parseInt(sensorOverlay3dDaysSliderEl.value, 10);
+      syncSensorOverlay3dSliderUi();
+    });
+
+    sensorOverlay3dDaysSliderEl.addEventListener("change", () => {
+      sensor3dOverlayDays = parseInt(sensorOverlay3dDaysSliderEl.value, 10);
+      syncSensorOverlay3dSliderUi();
+      renderDashboard();
+    });
+
+    syncSensorOverlay3dSliderUi();
     applyQuickRange(1);
     restartTimer();
   </script>
