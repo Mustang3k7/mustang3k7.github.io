@@ -381,9 +381,10 @@ Założenia i interpretacja działania:
     <section class="card top-controls">
       <div class="row">
         <div class="row-left">
-          <button class="btn active" data-hours="1">1 h</button>
+          <button class="btn" data-hours="1">1 h</button>
           <button class="btn" data-hours="3">3 h</button>
           <button class="btn" data-hours="6">6 h</button>
+          <button class="btn active" data-hours="8">8 h</button>
           <button class="btn" data-hours="12">12 h</button>
           <button class="btn" data-hours="24">24 h</button>
           <button class="btn" data-hours="72">3 dni</button>
@@ -393,7 +394,7 @@ Założenia i interpretacja działania:
         <div class="row-right">
           <label class="toggle-wrap">
             <span>AUTO</span>
-            <input id="autoToggle" type="checkbox" checked />
+            <input id="autoToggle" type="checkbox" />
           </label>
 
           <select id="intervalSelect" class="select">
@@ -411,9 +412,9 @@ Założenia i interpretacja działania:
       <div class="slider-wrap">
         <div class="slider-head">
           <div>Zakres czasu suwakiem</div>
-          <div id="sliderHoursValue">1 h (0.04 dni)</div>
+          <div id="sliderHoursValue">8 h (0.33 dni)</div>
         </div>
-        <input id="hoursSlider" class="range-slider" type="range" min="1" max="720" step="1" value="1" />
+        <input id="hoursSlider" class="range-slider" type="range" min="1" max="720" step="1" value="8" />
       </div>
 
       <div class="row">
@@ -432,7 +433,7 @@ Założenia i interpretacja działania:
       <div class="chart-head">
         <div>
           <div class="chart-title">Sensor overlay 3D</div>
-          <div class="chart-subtitle">Tylko temperatura sensora, nakładka dobowa w 3D: X = godzina, Y = dzień, Z = temperatura</div>
+          <div class="chart-subtitle">Tylko temperatura sensora, nakładka dobowa w 3D: X = dzień, Y = godzina, Z = temperatura</div>
         </div>
         <div class="overlay-controls">
           <label for="sensorOverlay3dDaysSlider">Liczba dni:</label>
@@ -518,7 +519,7 @@ Założenia i interpretacja działania:
     const DEFAULT_TEMP_AXIS_MAX = 10;
     const AXIS_DATA_COVERAGE_TARGET = 0.8;
 
-    let currentRangeHours = 1;
+    let currentRangeHours = 8;
     let useCustomRange = false;
     let refreshTimer = null;
     let lublinGeo = null;
@@ -897,6 +898,14 @@ Założenia i interpretacja działania:
       return { start, end };
     }
 
+    function updateSensorOverlayAvailabilityFromData(sensorData) {
+      const uniqueDays = new Set(
+        sensorData.x.map(d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`)
+      );
+      sensorAvailableDaysMax = Math.max(1, uniqueDays.size);
+      syncSensorOverlay3dSliderUi();
+    }
+
     function renderSensorOverlay3D(sensorData, selectedDays) {
       if (!sensorData.x.length || !sensorData.y.length) {
         Plotly.react("sensorOverlay3dChart", [], {}, getCommonPlotConfig());
@@ -916,25 +925,26 @@ Założenia i interpretacja działania:
         });
       }
 
-      const dayKeys = Array.from(grouped.keys()).sort().slice(-selectedDays);
+      const allDayKeys = Array.from(grouped.keys()).sort();
+      const dayKeys = allDayKeys.slice(-selectedDays);
       const traces = [];
       const palette = ["#4f8cff", "#22c55e", "#f59e0b", "#f472b6", "#38bdf8", "#a78bfa", "#ef4444", "#10b981", "#fb7185", "#eab308"];
-      const tickvals = [];
-      const ticktext = [];
+      const xTickvals = [];
+      const xTicktext = [];
       const allTemps = [];
 
       dayKeys.forEach((key, idx) => {
         const points = grouped.get(key).sort((a, b) => a.hour - b.hour);
-        tickvals.push(idx);
-        ticktext.push(key);
+        xTickvals.push(idx);
+        xTicktext.push(key);
         allTemps.push(...points.map(p => p.temp).filter(v => Number.isFinite(v)));
 
         traces.push({
           type: "scatter3d",
           mode: "lines+markers",
           name: key,
-          x: points.map(p => p.hour),
-          y: points.map(() => idx),
+          x: points.map(() => idx),
+          y: points.map(p => p.hour),
           z: points.map(p => p.temp),
           customdata: points.map(p => [key, p.date.toLocaleTimeString("pl-PL"), p.temp]),
           line: { width: 5, color: palette[idx % palette.length] },
@@ -954,24 +964,24 @@ Założenia i interpretacja działania:
         scene: {
           bgcolor: "rgba(0,0,0,0)",
           aspectmode: "manual",
-          aspectratio: { x: 1.45, y: 1.25, z: 1.1 },
-          camera: { eye: { x: 1.45, y: 1.4, z: 0.9 } },
+          aspectratio: { x: 1.25, y: 1.45, z: 1.1 },
+          camera: { eye: { x: 1.4, y: 1.35, z: 0.9 } },
           xaxis: {
-            title: "Godzina doby",
-            gridcolor: "#243146",
-            zerolinecolor: "#243146",
-            backgroundcolor: "rgba(0,0,0,0)",
-            range: [0, 24]
-          },
-          yaxis: {
             title: "Dzień",
             gridcolor: "#243146",
             zerolinecolor: "#243146",
             backgroundcolor: "rgba(0,0,0,0)",
             tickmode: "array",
-            tickvals,
-            ticktext,
+            tickvals: xTickvals,
+            ticktext: xTicktext,
             range: [-0.5, Math.max(dayKeys.length - 0.5, 0.5)]
+          },
+          yaxis: {
+            title: "Godzina doby",
+            gridcolor: "#243146",
+            zerolinecolor: "#243146",
+            backgroundcolor: "rgba(0,0,0,0)",
+            range: [0, 24]
           },
           zaxis: {
             title: "Temperatura [°C]",
@@ -985,7 +995,7 @@ Założenia i interpretacja działania:
       };
 
       Plotly.react("sensorOverlay3dChart", traces, layout, getCommonPlotConfig());
-      sensorOverlay3dInfoEl.textContent = `Overlay 3D sensora | dni na wykresie: ${dayKeys.length} | punktów: ${sensorData.y.length} | zakres dostępnych dni: ${sensorAvailableDaysMax}`;
+      sensorOverlay3dInfoEl.textContent = `Overlay 3D sensora | dni na wykresie: ${dayKeys.length} | punktów: ${sensorData.y.length} | zakres danych bieżącego pobrania: ${sensorAvailableDaysMax} dni`;
     }
 
     function setStatsBlock(prefix, stats, pointCount) {
@@ -1533,19 +1543,15 @@ Założenia i interpretacja działania:
       statusEl.textContent = "Pobieranie...";
       try {
         const range = getActiveRange();
-        const overlayRange = getSensorOverlayRange(sensor3dOverlayDays);
-        const [sensorData, lublinCurrent, lublinHistory, lublinModel, sunDaily, sensorOverlayData, availableSensorDays] = await Promise.all([
+        const [sensorData, lublinCurrent, lublinHistory, lublinModel, sunDaily] = await Promise.all([
           fetchThingSpeakRange(range.start, range.end),
           fetchLublinCurrent(),
           fetchLublinHistory(range.start, range.end),
           fetchLublinModelLine(range.start, range.end),
-          fetchLublinSunDaily(),
-          fetchThingSpeakRange(overlayRange.start, overlayRange.end, 12000),
-          fetchSensorAvailableDays()
+          fetchLublinSunDaily()
         ]);
 
-        sensorAvailableDaysMax = availableSensorDays;
-        syncSensorOverlay3dSliderUi();
+        updateSensorOverlayAvailabilityFromData(sensorData);
 
         updateAnalysisPanel(sensorData, lublinHistory, lublinCurrent, sunDaily);
         renderMainChart(sensorData, lublinHistory, lublinModel);
@@ -1584,7 +1590,7 @@ Założenia i interpretacja działania:
         }
 
         renderMollier3D(history3dPoints, current3dPoint);
-        renderSensorOverlay3D(sensorOverlayData, sensor3dOverlayDays);
+        renderSensorOverlay3D(sensorData, sensor3dOverlayDays);
         statusEl.textContent = `OK | od ${formatDateTime(range.start)} do ${formatDateTime(range.end)} | S: ${sensorData.y.length} | L: ${lublinHistory.temp.length}`;
       } catch (error) {
         console.error(error);
@@ -1684,7 +1690,7 @@ Założenia i interpretacja działania:
     });
 
     syncSensorOverlay3dSliderUi();
-    applyQuickRange(1);
+    applyQuickRange(8);
     restartTimer();
   </script>
 </body>
