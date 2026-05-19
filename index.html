@@ -1474,7 +1474,7 @@ Założenia i interpretacja działania:
           lines.push('Świeżość ostatniej próbki: ' + quality.freshnessText + '.');
         }
 
-		lastRangeReportText = lines.join('\n');
+		lastRangeReportText = lines.join(String.fromCharCode(10));
 
         el.rangeReportText.textContent = lastRangeReportText;
       }
@@ -2516,7 +2516,7 @@ Założenia i interpretacja działania:
       function exportRowsToCsv(rows, fileName) {
         if (!rows.length) throw new Error('Brak danych do eksportu.');
         const headers = Object.keys(rows[0]);
-        const csv = [headers.join(';')].concat(rows.map(function (row) { return headers.map(function (h) { return JSON.stringify(row[h] == null ? '' : row[h]); }).join(';'); })).join('\n');
+        const csv = [headers.join(';')].concat(rows.map(function (row) { return headers.map(function (h) { return JSON.stringify(row[h] == null ? '' : row[h]); }).join(';'); })).join(String.fromCharCode(10));
         downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), fileName);
       }
 
