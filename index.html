@@ -6,11 +6,17 @@ Cel:
 - Pokazanie dwóch wariantów głównego wykresu temperatury:
   1) wersji pełnej: sensor + Lublin + model,
   2) wersji skupionej na sensorze, z Lublinem i modelem ukrytymi domyślnie.
-- Pokazanie trzech overlayów 3D:
+- Pokazanie sześciu widoków 3D:
   1) sensor z bieżącego zakresu,
-  2) sensor z pełnego zbioru danych,
-  3) meteo z bieżącego zakresu.
+  2) sensor + meteo z bieżącego zakresu,
+  3) wykres Moliera 3D,
+  4) sensor z pełnego zbioru danych,
+  5) meteo z bieżącego zakresu,
+  6) powierzchnie 3D sensor + meteo.
 - Udostępnienie eksportu danych do CSV i XLSX.
+- Szybkie sterowanie widokami 3D: reset widoków oraz zbiorcze ukrywanie/pokazywanie legend.
+- Kontrola jakości danych: świeżość ostatniego punktu, luki w zapisie, przybliżony interwał próbkowania i różnica sensor–Lublin.
+- Generowanie krótkiego raportu tekstowego z bieżącego zakresu.
 Użycie:
 - Podmień aktualny plik index.html w repozytorium GitHub Pages.
 - Otwórz stronę w przeglądarce.
@@ -39,7 +45,8 @@ Uwagi:
 - Wersja „pełny overlay 3D” używa osobnego, możliwie pełnego zbioru danych sensora.
 - W overlayach 3D zastosowano delikatne wygładzanie przez lekką średnią kroczącą,
   bez agresywnego zaokrąglania toru.
-Data: 2026-04-08
+Data utworzenia: 2026-04-08
+Data ostatniej modyfikacji: 2026-05-20
 Status: narzędzie
 
 Założenia i interpretacja działania:
@@ -51,6 +58,8 @@ Założenia i interpretacja działania:
 - Strona ma nie przesuwać się poziomo przy przypadkowym skalowaniu.
 - Dane 3D są przygotowywane od razu po pobraniu, aby zmiana projekcji była natychmiastowa.
 - Przy pierwszym uruchomieniu pobierany jest zakres 5 dni, aby strona startowała szybciej; pełny zakres od 29.03.2026 wymaga osobnego kliknięcia.
+- Awaria mniej krytycznych źródeł meteo nie powinna zatrzymywać odczytu sensora ani całej strony.
+- Dashboard ma pokazywać nie tylko wykresy, ale także stan wiarygodności danych: opóźnienie ostatniej próbki, orientacyjny interwał próbkowania i wykryte większe przerwy w zapisie.
 -->
 <!DOCTYPE html>
 <html lang="pl">
@@ -289,6 +298,14 @@ Założenia i interpretacja działania:
     .up { color: var(--warn); }
     .down { color: var(--accent-2); }
     .flat { color: var(--muted); }
+
+    .report-text {
+      white-space: pre-wrap;
+      line-height: 1.45;
+      color: var(--text);
+      font-size: 14px;
+      padding: 10px 6px 12px 6px;
+    }
   </style>
 </head>
 <body>
@@ -305,6 +322,9 @@ Założenia i interpretacja działania:
           <button class="btn" data-hours="72">3 dni</button>
           <button class="btn active" data-hours="120">5 dni</button>
           <button class="btn" data-hours="168">7 dni</button>
+          <button class="btn" data-hours="240">10 dni</button>
+          <button class="btn" data-hours="336">14 dni</button>
+          <button class="btn" data-hours="504">21 dni</button>
         </div>
         <div class="row-right">
           <label class="toggle-wrap"><span>AUTO</span><input id="autoToggle" type="checkbox" /></label>
@@ -315,6 +335,8 @@ Założenia i interpretacja działania:
             <option value="60">60 s</option>
           </select>
           <button id="refreshBtn" class="btn">Odśwież</button>
+          <button id="reset3dViewsBtn" class="btn">Reset widoków 3D</button>
+          <button id="toggleAll3dLegendsBtn" class="btn">Ukryj legendy 3D</button>
           <div id="status" class="status">Start...</div>
         </div>
       </div>
@@ -424,6 +446,9 @@ Założenia i interpretacja działania:
       <div class="card metric-card"><div class="metric-label">Zachód słońca</div><div id="sunsetValue" class="metric-value">--:--</div><div class="metric-note">Lublin, czas lokalny Polski</div></div>
       <div class="card metric-card"><div class="metric-label">Ocena warunków</div><div id="comfortValue" class="metric-value">Brak danych</div><div id="comfortSub" class="metric-note">Panel pokaże orientacyjną ocenę po pobraniu danych.</div></div>
       <div class="card metric-card"><div class="metric-label">Liczba punktów</div><div id="pointCountsSummary" class="metric-value">S: -- | L: --</div><div class="metric-note">S = sensor, L = Lublin</div></div>
+      <div class="card metric-card"><div class="metric-label">Różnica S–Lublin</div><div id="tempDeltaValue" class="metric-value">--.-- °C</div><div id="tempDeltaNote" class="metric-note">Sensor minus najbliższy punkt meteo.</div></div>
+      <div class="card metric-card"><div class="metric-label">Świeżość danych</div><div id="dataFreshnessValue" class="metric-value">--</div><div id="dataFreshnessNote" class="metric-note">Czas od ostatniej próbki sensora.</div></div>
+      <div class="card metric-card"><div class="metric-label">Jakość zapisu</div><div id="dataQualityValue" class="metric-value">--</div><div id="dataQualityNote" class="metric-note">Luki i interwał próbkowania w bieżącym zakresie.</div></div>
     </section>
 
     <section class="main-grid">
@@ -561,6 +586,15 @@ Założenia i interpretacja działania:
 
     <section class="card chart-card">
       <div class="chart-head">
+        <div><div class="chart-title">Raport bieżącego zakresu</div><div class="chart-subtitle">Krótki opis stanu danych, temperatury i różnicy względem Lublina</div></div>
+        <div class="overlay-controls"><button id="copyReportBtn" class="btn">Kopiuj raport</button></div>
+      </div>
+      <div id="rangeReportText" class="report-text">Raport zostanie przygotowany po pobraniu danych.</div>
+      <div id="copyReportInfo" class="info-line">Raport można wkleić do notatki, wiadomości albo dokumentacji.</div>
+    </section>
+
+    <section class="card chart-card">
+      <div class="chart-head">
         <div><div class="chart-title">Eksport danych</div><div class="chart-subtitle">Możesz pobrać bieżący zakres albo pełny zbiór sensora</div></div>
         <div class="overlay-controls">
           <label for="exportDatasetSelect">Zbiór:</label>
@@ -613,6 +647,7 @@ Założenia i interpretacja działania:
       let useCustomRange = false;
       let refreshTimer = null;
       let lublinGeo = null;
+      let lublinGeoPromise = null;
       let chartUiRevision = 0;
       let progressVisibleValue = 0;
       let renderDashboardInProgress = false;
@@ -620,13 +655,13 @@ Założenia i interpretacja działania:
       let customRangeEndFollowsNow = false;
       let defaultStartFullRangeEnabled = false;
       let forceMaxOverlaySlidersOnNextRender = false;
+      let all3dLegendsVisible = true;
+      let lastRangeReportText = '';
 
       let sensor3dOverlayDays = 3;
       let sensorAvailableDaysMax = 1;
-      let sensorOldestTimestampCache = null;
       let sensor3dOverlayAutoMaxPending = true;
       let sensor3dProjectionMode = 'perspective';
-      let sensor3dShowDots = false;
 
       let meteo3dOverlayDays = 3;
       let meteoAvailableDaysMax = 1;
@@ -655,8 +690,9 @@ Założenia i interpretacja działania:
       let currentSensorPrepared3D = null;
       let currentMeteoPrepared3D = null;
       let fullSensorPrepared3D = null;
-      let fullCombinedPrepared3D = null;
       let currentSensorMeteoPrepared3D = null;
+      const THREE_D_CHART_IDS = ['sensorOverlay3dChart', 'sensorMeteoOverlay3dChart', 'sensorMeteoSurface3dChart', 'mollier3dChart', 'sensorOverlay3dFullChart', 'meteoOverlay3dChart'];
+
       const sceneViewState = {
         sensorOverlay3dChart: 'iso',
         sensorMeteoOverlay3dChart: 'iso',
@@ -696,6 +732,8 @@ Założenia i interpretacja działania:
         autoToggle: byId('autoToggle'),
         intervalSelect: byId('intervalSelect'),
         refreshBtn: byId('refreshBtn'),
+        reset3dViewsBtn: byId('reset3dViewsBtn'),
+        toggleAll3dLegendsBtn: byId('toggleAll3dLegendsBtn'),
         hoursSlider: byId('hoursSlider'),
         sliderHoursValue: byId('sliderHoursValue'),
         overlayDaysSlider: byId('overlayDaysSlider'),
@@ -718,6 +756,15 @@ Założenia i interpretacja działania:
         comfortValue: byId('comfortValue'),
         comfortSub: byId('comfortSub'),
         pointCountsSummary: byId('pointCountsSummary'),
+        tempDeltaValue: byId('tempDeltaValue'),
+        tempDeltaNote: byId('tempDeltaNote'),
+        dataFreshnessValue: byId('dataFreshnessValue'),
+        dataFreshnessNote: byId('dataFreshnessNote'),
+        dataQualityValue: byId('dataQualityValue'),
+        dataQualityNote: byId('dataQualityNote'),
+        rangeReportText: byId('rangeReportText'),
+        copyReportBtn: byId('copyReportBtn'),
+        copyReportInfo: byId('copyReportInfo'),
         mollier3dInfo: byId('mollier3dInfo'),
         debugInfo: byId('debugInfo'),
         sensorOverlay3dDaysSlider: byId('sensorOverlay3dDaysSlider'),
@@ -859,8 +906,13 @@ Założenia i interpretacja działania:
 
       function getActiveRange() {
         if (useCustomRange && el.startDate.value && el.endDate.value) {
-          return { start: new Date(el.startDate.value), end: new Date(el.endDate.value) };
+          const customStart = new Date(el.startDate.value);
+          const customEnd = new Date(el.endDate.value);
+          if (isValidDate(customStart) && isValidDate(customEnd) && customStart < customEnd) {
+            return { start: customStart, end: customEnd };
+          }
         }
+
         const end = new Date();
         const start = new Date(end.getTime() - currentRangeHours * 60 * 60 * 1000);
         return { start: start, end: end };
@@ -919,6 +971,117 @@ Założenia i interpretacja działania:
         const amplitude = max - min;
         const trend = finite[finite.length - 1] - finite[0];
         return { min: min, max: max, avg: avg, amplitude: amplitude, trend: trend };
+      }
+
+      function calculateMedian(values) {
+        const finite = getFiniteNumbers(values).sort(function (a, b) { return a - b; });
+        if (!finite.length) return null;
+        const mid = Math.floor(finite.length / 2);
+        return finite.length % 2 ? finite[mid] : (finite[mid - 1] + finite[mid]) / 2;
+      }
+
+      function findNearestTimeValue(targetDate, xArr, yArr, maxDiffMs) {
+        if (!isValidDate(targetDate) || !Array.isArray(xArr) || !Array.isArray(yArr) || !xArr.length) return null;
+        let best = null;
+        const targetMs = targetDate.getTime();
+        for (let i = 0; i < Math.min(xArr.length, yArr.length); i++) {
+          const d = xArr[i];
+          const v = Number(yArr[i]);
+          if (!isValidDate(d) || !Number.isFinite(v)) continue;
+          const diffMs = Math.abs(d.getTime() - targetMs);
+          if (maxDiffMs != null && diffMs > maxDiffMs) continue;
+          if (!best || diffMs < best.diffMs) {
+            best = { value: v, time: d, diffMs: diffMs };
+          }
+        }
+        return best;
+      }
+
+      function analyzeDataQuality(sensorData) {
+        const result = {
+          label: 'Brak danych',
+          note: 'Brak próbek sensora w bieżącym zakresie.',
+          freshnessText: '--',
+          freshnessNote: 'Brak ostatniej próbki.',
+          medianIntervalMin: null,
+          maxGapMin: null,
+          gapCount: 0,
+          ageMin: null
+        };
+
+        if (!sensorData || !sensorData.x || sensorData.x.length === 0) return result;
+
+        const sortedTimes = sensorData.x
+          .filter(isValidDate)
+          .map(function (d) { return d.getTime(); })
+          .sort(function (a, b) { return a - b; });
+
+        if (!sortedTimes.length) return result;
+
+        const lastMs = sortedTimes[sortedTimes.length - 1];
+        const nowMs = Date.now();
+        const ageMin = Math.max(0, (nowMs - lastMs) / 60000);
+        result.ageMin = ageMin;
+        result.freshnessText = ageMin < 60 ? ageMin.toFixed(1) + ' min' : (ageMin / 60).toFixed(2) + ' h';
+
+        const intervalsMin = [];
+        for (let i = 1; i < sortedTimes.length; i++) {
+          const interval = (sortedTimes[i] - sortedTimes[i - 1]) / 60000;
+          if (Number.isFinite(interval) && interval > 0) intervalsMin.push(interval);
+        }
+
+        const medianInterval = calculateMedian(intervalsMin);
+        const maxGap = intervalsMin.length ? Math.max.apply(null, intervalsMin) : null;
+        const gapThreshold = medianInterval != null ? Math.max(30, medianInterval * 4) : 30;
+        const gapCount = intervalsMin.filter(function (v) { return v > gapThreshold; }).length;
+
+        result.medianIntervalMin = medianInterval;
+        result.maxGapMin = maxGap;
+        result.gapCount = gapCount;
+
+        if (ageMin > 60) {
+          result.label = 'Opóźnione';
+          result.freshnessNote = 'Ostatnia próbka jest starsza niż 60 minut.';
+        } else if (ageMin > 20) {
+          result.label = 'Do sprawdzenia';
+          result.freshnessNote = 'Ostatnia próbka jest starsza niż 20 minut.';
+        } else {
+          result.freshnessNote = 'Ostatnia próbka wygląda aktualnie.';
+        }
+
+        if (gapCount > 0) {
+          result.label = result.label === 'Opóźnione' ? result.label : 'Luki';
+          result.note = 'Wykryto większe przerwy: ' + gapCount + '. Mediana interwału: ' + (medianInterval != null ? medianInterval.toFixed(2) + ' min' : '—') + ', największa luka: ' + (maxGap != null ? maxGap.toFixed(1) + ' min' : '—') + '.';
+        } else if (medianInterval != null) {
+          result.label = result.label === 'Brak danych' ? 'OK' : result.label;
+          result.note = 'Mediana interwału: ' + medianInterval.toFixed(2) + ' min, największa przerwa: ' + (maxGap != null ? maxGap.toFixed(1) + ' min' : '—') + '.';
+        } else {
+          result.label = result.label === 'Brak danych' ? 'Za mało danych' : result.label;
+          result.note = 'Zakres zawiera mniej niż dwie próbki, więc nie da się ocenić interwału.';
+        }
+
+        return result;
+      }
+
+      function calculateSensorLublinDelta(sensorData, lublinHistory, outsideCurrent) {
+        if (!sensorData || !sensorData.x.length || !sensorData.y.length) return null;
+        const sensorTime = sensorData.x[sensorData.x.length - 1];
+        const sensorValue = Number(sensorData.y[sensorData.y.length - 1]);
+        if (!isValidDate(sensorTime) || !Number.isFinite(sensorValue)) return null;
+
+        const nearest = findNearestTimeValue(sensorTime, lublinHistory.x || [], lublinHistory.temp || [], 90 * 60 * 1000);
+        const referenceValue = nearest ? nearest.value : (outsideCurrent && Number.isFinite(outsideCurrent.currentTemp) ? outsideCurrent.currentTemp : null);
+        const referenceTime = nearest ? nearest.time : (outsideCurrent && isValidDate(outsideCurrent.currentTime) ? outsideCurrent.currentTime : null);
+        if (!Number.isFinite(referenceValue)) return null;
+
+        return {
+          delta: sensorValue - referenceValue,
+          sensorValue: sensorValue,
+          sensorTime: sensorTime,
+          referenceValue: referenceValue,
+          referenceTime: referenceTime,
+          diffMin: referenceTime ? Math.abs(referenceTime.getTime() - sensorTime.getTime()) / 60000 : null
+        };
       }
 
       function evaluateComfort(temp) {
@@ -1004,7 +1167,29 @@ Założenia i interpretacja działania:
         return date instanceof Date && !Number.isNaN(date.getTime());
       }
 
+      function createEmptyLublinHistory() {
+        return { x: [], temp: [], rh: [], ah: [], pressure: [], dewPoint: [] };
+      }
+
+      function reportNonCriticalError(label, error) {
+        const message = label + ': ' + (error && error.message ? error.message : error);
+        console.warn(message, error);
+        setDebugInfo('Ostrzeżenie: ' + message);
+      }
+
+      function fallbackOnError(promise, label, fallbackValue) {
+        return Promise.resolve(promise).catch(function (error) {
+          reportNonCriticalError(label, error);
+          return fallbackValue;
+        });
+      }
+
       async function fetchThingSpeakRange(startDate, endDate, maxPoints, progressCallback) {
+        if (!isValidDate(startDate) || !isValidDate(endDate) || !(startDate < endDate)) {
+          if (progressCallback) progressCallback(0, 1, 'done', 0);
+          return { x: [], y: [] };
+        }
+
         const pointsLimit = typeof maxPoints === 'number' ? maxPoints : MAX_POINTS;
         const allX = [];
         const allY = [];
@@ -1049,23 +1234,6 @@ Założenia i interpretacja działania:
         return result;
       }
 
-      async function fetchSensorOldestTimestampApprox() {
-        if (sensorOldestTimestampCache) return sensorOldestTimestampCache;
-        const ancientStart = encodeURIComponent('2000-01-01 00:00:00');
-        const url = 'https://api.thingspeak.com/channels/' + CHANNEL_ID + '/fields/' + FIELD + '.json?start=' + ancientStart + '&results=1' + (READ_API_KEY ? '&api_key=' + READ_API_KEY : '');
-        const data = await fetchJson(url, 'ThingSpeak najstarszy punkt');
-
-        if (data && data.feeds && data.feeds.length && data.feeds[0] && data.feeds[0].created_at) {
-          sensorOldestTimestampCache = new Date(data.feeds[0].created_at);
-          return sensorOldestTimestampCache;
-        }
-
-        const fallbackUrl = 'https://api.thingspeak.com/channels/' + CHANNEL_ID + '.json' + (READ_API_KEY ? '?api_key=' + READ_API_KEY : '');
-        const fallbackData = await fetchJson(fallbackUrl, 'ThingSpeak metadane kanału');
-        sensorOldestTimestampCache = fallbackData && fallbackData.created_at ? new Date(fallbackData.created_at) : new Date();
-        return sensorOldestTimestampCache;
-      }
-
       async function fetchFullSensorDataset(force, progressCallback) {
         const useForce = !!force;
         const nowMs = Date.now();
@@ -1088,11 +1256,22 @@ Założenia i interpretacja działania:
 
       async function getLublinGeo() {
         if (lublinGeo) return lublinGeo;
-        const url = 'https://geocoding-api.open-meteo.com/v1/search?name=Lublin&count=1&language=pl&format=json';
-        const data = await fetchJson(url, 'Geokodowanie Lublina');
-        if (!data || !data.results || !data.results.length) throw new Error('Nie znaleziono Lublina.');
-        lublinGeo = { latitude: data.results[0].latitude, longitude: data.results[0].longitude };
-        return lublinGeo;
+        if (lublinGeoPromise) return lublinGeoPromise;
+
+        lublinGeoPromise = (async function () {
+          const url = 'https://geocoding-api.open-meteo.com/v1/search?name=Lublin&count=1&language=pl&format=json';
+          const data = await fetchJson(url, 'Geokodowanie Lublina');
+          if (!data || !data.results || !data.results.length) throw new Error('Nie znaleziono Lublina.');
+          lublinGeo = { latitude: data.results[0].latitude, longitude: data.results[0].longitude };
+          return lublinGeo;
+        })();
+
+        try {
+          return await lublinGeoPromise;
+        } catch (error) {
+          lublinGeoPromise = null;
+          throw error;
+        }
       }
 
       async function fetchLublinCurrent() {
@@ -1100,9 +1279,9 @@ Założenia i interpretacja działania:
         const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + geo.latitude + '&longitude=' + geo.longitude + '&current=temperature_2m,relative_humidity_2m,pressure_msl&timezone=GMT';
         const data = await fetchJson(url, 'Open-Meteo aktualne dane');
         const current = data && data.current ? data.current : {};
-        const temp = current.temperature_2m;
-        const rh = current.relative_humidity_2m;
-        const pressure = current.pressure_msl;
+        const temp = Number(current.temperature_2m);
+        const rh = Number(current.relative_humidity_2m);
+        const pressure = Number(current.pressure_msl);
         return {
           currentTemp: temp,
           currentRH: rh,
@@ -1201,11 +1380,7 @@ Założenia i interpretacja działania:
         return { sunrise: daily.sunrise ? daily.sunrise[0] : null, sunset: daily.sunset ? daily.sunset[0] : null };
       }
 
-      function updateCurrentMetric(elRef, value, suffix) {
-        elRef.textContent = value == null || Number.isNaN(value) ? '--.-- ' + suffix : Number(value).toFixed(2) + ' ' + suffix;
-      }
-
-      function updateAnalysisPanel(sensorData, lublinHistory, outsideCurrent, sunDaily) {
+      function updateAnalysisPanel(sensorData, lublinHistory, outsideCurrent, sunDaily, range) {
         const sensorX = sensorData.x;
         const sensorY = sensorData.y;
         const lublinY = lublinHistory.temp;
@@ -1224,13 +1399,13 @@ Założenia i interpretacja działania:
           el.comfortSub.textContent = comfort.sub;
         }
 
-        if (outsideCurrent && outsideCurrent.currentTemp != null) {
+        if (outsideCurrent && Number.isFinite(outsideCurrent.currentTemp)) {
           el.outsideTemp.textContent = Number(outsideCurrent.currentTemp).toFixed(2) + ' °C';
-          el.outsideInfo.textContent = 'Aktualizacja: ' + (outsideCurrent.currentTime ? formatDateTime(outsideCurrent.currentTime) : '—');
-          el.outsideRH.textContent = outsideCurrent.currentRH != null ? Number(outsideCurrent.currentRH).toFixed(1) + ' %' : '--.-- %';
-          el.outsideAH.textContent = outsideCurrent.currentAH != null ? Number(outsideCurrent.currentAH).toFixed(2) + ' g/m³' : '--.-- g/m³';
-          el.outsidePressure.textContent = outsideCurrent.currentPressure != null ? Number(outsideCurrent.currentPressure).toFixed(1) + ' hPa' : '--.-- hPa';
-          el.outsideDewPoint.textContent = outsideCurrent.currentDewPoint != null ? Number(outsideCurrent.currentDewPoint).toFixed(2) + ' °C' : '--.-- °C';
+          el.outsideInfo.textContent = 'Aktualizacja: ' + (isValidDate(outsideCurrent.currentTime) ? formatDateTime(outsideCurrent.currentTime) : '—');
+          el.outsideRH.textContent = Number.isFinite(outsideCurrent.currentRH) ? Number(outsideCurrent.currentRH).toFixed(1) + ' %' : '--.-- %';
+          el.outsideAH.textContent = Number.isFinite(outsideCurrent.currentAH) ? Number(outsideCurrent.currentAH).toFixed(2) + ' g/m³' : '--.-- g/m³';
+          el.outsidePressure.textContent = Number.isFinite(outsideCurrent.currentPressure) ? Number(outsideCurrent.currentPressure).toFixed(1) + ' hPa' : '--.-- hPa';
+          el.outsideDewPoint.textContent = Number.isFinite(outsideCurrent.currentDewPoint) ? Number(outsideCurrent.currentDewPoint).toFixed(2) + ' °C' : '--.-- °C';
         } else {
           el.outsideTemp.textContent = '--.-- °C';
           el.outsideInfo.textContent = 'Dane zewnętrzne: brak';
@@ -1253,6 +1428,55 @@ Założenia i interpretacja działania:
         setStatsBlock('sensor', sensorStats, sensorY.length);
         setStatsBlock('lublin', lublinStats, lublinY.length);
         el.pointCountsSummary.textContent = 'S: ' + sensorY.length + ' | L: ' + lublinY.length;
+
+        const deltaInfo = calculateSensorLublinDelta(sensorData, lublinHistory, outsideCurrent);
+        if (deltaInfo) {
+          const sign = deltaInfo.delta >= 0 ? '+' : '';
+          el.tempDeltaValue.textContent = sign + deltaInfo.delta.toFixed(2) + ' °C';
+          el.tempDeltaNote.textContent = 'Sensor: ' + deltaInfo.sensorValue.toFixed(2) + ' °C, odniesienie Lublin: ' + deltaInfo.referenceValue.toFixed(2) + ' °C' + (Number.isFinite(deltaInfo.diffMin) ? ', różnica czasu: ' + deltaInfo.diffMin.toFixed(0) + ' min.' : '.');
+        } else {
+          el.tempDeltaValue.textContent = '--.-- °C';
+          el.tempDeltaNote.textContent = 'Brak porównywalnego punktu meteo.';
+        }
+
+        const quality = analyzeDataQuality(sensorData);
+        el.dataFreshnessValue.textContent = quality.freshnessText;
+        el.dataFreshnessNote.textContent = quality.freshnessNote;
+        el.dataQualityValue.textContent = quality.label;
+        el.dataQualityNote.textContent = quality.note;
+        updateRangeReport(range, sensorStats, lublinStats, deltaInfo, quality, sensorY.length, lublinY.length);
+      }
+
+      function updateRangeReport(range, sensorStats, lublinStats, deltaInfo, quality, sensorCount, lublinCount) {
+        const lines = [];
+        lines.push('Zakres: ' + (range ? formatDateTime(range.start) + ' – ' + formatDateTime(range.end) : '—'));
+        lines.push('Punkty: sensor ' + sensorCount + ', meteo Lublin ' + lublinCount + '.');
+
+        if (sensorStats) {
+          lines.push('Sensor: średnia ' + sensorStats.avg.toFixed(2) + ' °C, min ' + sensorStats.min.toFixed(2) + ' °C, max ' + sensorStats.max.toFixed(2) + ' °C, amplituda ' + sensorStats.amplitude.toFixed(2) + ' °C.');
+        } else {
+          lines.push('Sensor: brak danych w wybranym zakresie.');
+        }
+
+        if (lublinStats) {
+          lines.push('Lublin: średnia ' + lublinStats.avg.toFixed(2) + ' °C, min ' + lublinStats.min.toFixed(2) + ' °C, max ' + lublinStats.max.toFixed(2) + ' °C.');
+        } else {
+          lines.push('Lublin: brak danych porównawczych w wybranym zakresie.');
+        }
+
+        if (deltaInfo) {
+          const sign = deltaInfo.delta >= 0 ? '+' : '';
+          lines.push('Aktualna różnica sensor–Lublin: ' + sign + deltaInfo.delta.toFixed(2) + ' °C.');
+        }
+
+        lines.push('Jakość danych: ' + quality.label + '. ' + quality.note);
+        if (Number.isFinite(quality.ageMin)) {
+          lines.push('Świeżość ostatniej próbki: ' + quality.freshnessText + '.');
+        }
+
+		lastRangeReportText = lines.join('\n');
+
+        el.rangeReportText.textContent = lastRangeReportText;
       }
 
       function setStatsBlock(prefix, stats, pointCount) {
@@ -1302,6 +1526,18 @@ Założenia i interpretacja działania:
       function updateLegendButtonText(button, chartId) {
         if (!button) return;
         button.textContent = getLegendVisible(chartId) ? 'Ukryj legendę' : 'Pokaż legendę';
+      }
+
+      function updateAll3DLegendButtonText() {
+        if (!el.toggleAll3dLegendsBtn) return;
+        el.toggleAll3dLegendsBtn.textContent = all3dLegendsVisible ? 'Ukryj legendy 3D' : 'Pokaż legendy 3D';
+      }
+
+      function updateAllIndividualLegendButtons() {
+        document.querySelectorAll('[data-3d-chart][data-3d-legend="toggle"]').forEach(function (button) {
+          const chartId = button.getAttribute('data-3d-chart');
+          updateLegendButtonText(button, chartId);
+        });
       }
 
       function safePlotlyReact(chartId, traces, layout, config, infoEl) {
@@ -1492,6 +1728,31 @@ Założenia i interpretacja działania:
         return safePlotlyRelayout(chartId, buildCameraRelayoutUpdate(camera));
       }
 
+      function resetAll3DViews() {
+        THREE_D_CHART_IDS.forEach(function (chartId) {
+          if (Object.prototype.hasOwnProperty.call(sceneViewState, chartId)) {
+            sceneViewState[chartId] = 'iso';
+            apply3DCamera(chartId);
+          }
+        });
+      }
+
+      function setAll3DLegends(visible) {
+        all3dLegendsVisible = !!visible;
+        THREE_D_CHART_IDS.forEach(function (chartId) {
+          if (Object.prototype.hasOwnProperty.call(legendVisibleState, chartId)) {
+            legendVisibleState[chartId] = all3dLegendsVisible;
+            safePlotlyRelayout(chartId, { showlegend: all3dLegendsVisible });
+          }
+        });
+        updateAll3DLegendButtonText();
+        updateAllIndividualLegendButtons();
+      }
+
+      function toggleAll3DLegends() {
+        setAll3DLegends(!all3dLegendsVisible);
+      }
+
       function set3DPlaneView(chartId, view) {
         if (!Object.prototype.hasOwnProperty.call(sceneViewState, chartId)) return;
         sceneViewState[chartId] = view;
@@ -1561,7 +1822,7 @@ Założenia i interpretacja działania:
       function createMainChartLayout(sensorX, sensorY, lublinY, modelY) {
         const mergedValues = sensorY.concat(lublinY).concat(modelY).filter(function (v) { return Number.isFinite(v); });
         const yRange = mergedValues.length ? computePaddedYRange(mergedValues) : undefined;
-        const sensorXRange = sensorX.length ? [sensorX[0], sensorX[sensorX.length - 1]] : undefined;
+        const sensorXRange = sensorX.length >= 2 ? [sensorX[0], sensorX[sensorX.length - 1]] : undefined;
         return {
           margin: { l: 56, r: 18, t: 12, b: 70 },
           paper_bgcolor: 'rgba(0,0,0,0)',
@@ -1570,7 +1831,7 @@ Założenia i interpretacja działania:
           dragmode: 'pan',
           uirevision: chartUiRevision,
           legend: { orientation: 'h', y: 1.12, x: 0 },
-          xaxis: { title: 'Czas', gridcolor: '#243146', zerolinecolor: '#243146', fixedrange: false, autorange: false, range: sensorXRange, rangeslider: buildRangeSliderConfig() },
+          xaxis: { title: 'Czas', gridcolor: '#243146', zerolinecolor: '#243146', fixedrange: false, autorange: !sensorXRange, range: sensorXRange, rangeslider: buildRangeSliderConfig() },
           yaxis: { title: '°C', gridcolor: '#243146', zerolinecolor: '#243146', autorange: false, range: yRange, fixedrange: false },
           showlegend: true
         };
@@ -1593,9 +1854,11 @@ Założenia i interpretacja działania:
       function renderMainChart(chartId, sensorData, lublinHistory, lublinModel, hiddenDefaults) {
         const traces = buildMainChartTraces(sensorData, lublinHistory, lublinModel, !!hiddenDefaults);
         const layout = createMainChartLayout(sensorData.x, sensorData.y, lublinHistory.temp, lublinModel.temp);
-        safePlotlyReact(chartId, traces, layout, getCommonPlotConfig());
-        bindAutoscaleHandlers(chartId);
-        setTimeout(function () { rescaleChartYAxisToVisibleTraces(chartId); }, 0);
+        safePlotlyReact(chartId, traces, layout, getCommonPlotConfig()).then(function (drawn) {
+          if (!drawn) return;
+          bindAutoscaleHandlers(chartId);
+          setTimeout(function () { rescaleChartYAxisToVisibleTraces(chartId); }, 0);
+        });
       }
 
       function renderHistogram(sensorY) {
@@ -2265,6 +2528,37 @@ Założenia i interpretacja działania:
         XLSX.writeFile(workbook, fileName);
       }
 
+      async function copyTextToClipboard(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(text);
+        }
+
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', 'readonly');
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const ok = document.execCommand('copy');
+        textarea.remove();
+        return ok ? Promise.resolve() : Promise.reject(new Error('Nie udało się skopiować tekstu.'));
+      }
+
+      function handleCopyReport() {
+        const text = lastRangeReportText || el.rangeReportText.textContent || '';
+        if (!text.trim()) {
+          el.copyReportInfo.textContent = 'Brak raportu do skopiowania.';
+          return;
+        }
+        copyTextToClipboard(text).then(function () {
+          el.copyReportInfo.textContent = 'Raport skopiowany do schowka.';
+        }).catch(function (error) {
+          console.error(error);
+          el.copyReportInfo.textContent = 'Nie udało się skopiować raportu. Można zaznaczyć go ręcznie.';
+        });
+      }
+
       async function handleExport() {
         try {
           const dataset = el.exportDatasetSelect.value;
@@ -2324,22 +2618,22 @@ Założenia i interpretacja działania:
             else if (phase === 'done') setProgress(48, 'Dane sensora gotowe.');
           });
 
-          const lublinCurrentPromise = fetchLublinCurrent();
-          const lublinHistoryPromise = fetchLublinHistory(range.start, range.end).then(function (data) {
+          const lublinCurrentPromise = fallbackOnError(fetchLublinCurrent(), 'Aktualne dane meteo', null);
+          const lublinHistoryPromise = fallbackOnError(fetchLublinHistory(range.start, range.end).then(function (data) {
             meteoCountLive = data.temp.length;
             setProgressCounts(sensorCountLive, meteoCountLive);
             return data;
-          });
-          const lublinModelPromise = fetchLublinModelLine(range.start, range.end);
-          const sunDailyPromise = fetchLublinSunDaily();
+          }), 'Historia/prognoza meteo', createEmptyLublinHistory());
+          const lublinModelPromise = fallbackOnError(fetchLublinModelLine(range.start, range.end), 'Linia modelu meteo', { x: [], temp: [] });
+          const sunDailyPromise = fallbackOnError(fetchLublinSunDaily(), 'Wschód i zachód słońca', { sunrise: null, sunset: null });
           const fullSensorPromise = defaultStartFullRangeEnabled
-            ? fetchFullSensorDataset(false, function (done, total, fromCache, phase, count) {
+            ? fallbackOnError(fetchFullSensorDataset(false, function (done, total, fromCache, phase, count) {
                 if (fromCache) { setProgress(74, 'Pełny zbiór sensora z pamięci podręcznej'); return; }
                 if (phase === 'fetch') setProgress(50 + (done / Math.max(total, 1)) * 20, 'Pobieranie pełnego zbioru sensora: ' + done + '/' + total + ' partii');
                 else if (phase === 'processing') setProgress(72, 'Scalanie i filtrowanie pełnego zbioru sensora...');
                 else if (phase === 'finalizing') setProgress(76, 'Redukcja liczby punktów pełnego zbioru sensora...');
                 else if (phase === 'done') setProgress(78, 'Pełny zbiór sensora gotowy (' + (count || 0) + ' próbek).');
-              })
+                            }), 'Pełny zbiór sensora', null)
             : Promise.resolve(null);
 
           const results = await Promise.all([sensorPromise, lublinCurrentPromise, lublinHistoryPromise, lublinModelPromise, sunDailyPromise, fullSensorPromise]);
@@ -2348,7 +2642,8 @@ Założenia i interpretacja działania:
           const lublinHistory = results[2];
           const lublinModel = results[3];
           const sunDaily = results[4];
-          const fullSensorData = results[5] || sensorData;
+          const fullSensorRawData = results[5];
+          const fullSensorData = fullSensorRawData || sensorData;
 
           const fetchMs = performance.now() - fetchStart;
           setProgress(80, 'Dane pobrane. Przygotowanie wykresów...');
@@ -2356,8 +2651,8 @@ Założenia i interpretacja działania:
 
           lastCurrentSensorData = sensorData;
           lastCurrentLublinData = lublinHistory;
-          if (defaultStartFullRangeEnabled) {
-            fullSensorCacheData = fullSensorData;
+          if (defaultStartFullRangeEnabled && fullSensorRawData) {
+            fullSensorCacheData = fullSensorRawData;
             fullSensorCacheTs = Date.now();
           }
 
@@ -2374,7 +2669,7 @@ Założenia i interpretacja działania:
           updateOverlayCompareAvailability(sensorData, lublinHistory);
           forceMaxOverlaySlidersOnNextRender = false;
           setProgressCounts(sensorData.y.length, lublinHistory.temp.length);
-          updateAnalysisPanel(sensorData, lublinHistory, lublinCurrent, sunDaily);
+          updateAnalysisPanel(sensorData, lublinHistory, lublinCurrent, sunDaily, range);
 
           setProgress(84, 'Rysowanie wykresów głównych 2D...');
           renderMainChart('mainChartSensorFocus', sensorData, lublinHistory, lublinModel, true);
@@ -2495,6 +2790,7 @@ Założenia i interpretacja działania:
         console.assert(formatHoursLabel(24) === '24 h (1.00 dni)', 'Test formatHoursLabel nie przeszedł.');
         console.assert(DEFAULT_START_DATE_STR === '2026-03-29T00:00', 'Test domyślnej daty początkowej nie przeszedł.');
         console.assert(currentRangeHours === 120, 'Test domyślnego zakresu 5 dni nie przeszedł.');
+        console.assert(THREE_D_CHART_IDS.length === 6, 'Test listy wykresów 3D nie przeszedł.');
         const r = computePaddedYRange([1, 2, null, NaN, 'x']);
         console.assert(Array.isArray(r) && r.length === 2 && r[0] < 1 && r[1] > 2, 'Test computePaddedYRange nie przeszedł.');
         const stats = calculateStats([null, 1, 3, NaN]);
@@ -2527,6 +2823,14 @@ Założenia i interpretacja działania:
         const surfaceBuild = buildSurfaceOverlay3DTraces(combinedPrepared, 1);
         console.assert(surfaceBuild.traces.length === 2 && surfaceBuild.sensorSurfacePoints > 0 && surfaceBuild.meteoSurfacePoints > 0, 'Test buildSurfaceOverlay3DTraces nie przeszedł.');
         console.assert(getLegendVisible('sensorOverlay3dChart') === true, 'Test getLegendVisible nie przeszedł.');
+        console.assert(createEmptyLublinHistory().temp.length === 0, 'Test createEmptyLublinHistory nie przeszedł.');
+        const qualityTest = analyzeDataQuality({ x: [new Date(Date.now() - 60000), new Date()], y: [20, 21] });
+        console.assert(qualityTest && qualityTest.medianIntervalMin != null, 'Test analyzeDataQuality nie przeszedł.');
+        console.assert(Number.isFinite(20) && !Number.isFinite(Number(undefined)), 'Test walidacji wartości liczbowych nie przeszedł.');
+        const previousLegendState = all3dLegendsVisible;
+        setAll3DLegends(false);
+        console.assert(THREE_D_CHART_IDS.every(function (id) { return getLegendVisible(id) === false; }), 'Test zbiorczego ukrywania legend 3D nie przeszedł.');
+        setAll3DLegends(previousLegendState);
         const previousProgress = progressVisibleValue;
         progressVisibleValue = 40;
         setProgress(30, 'Test cofania paska');
@@ -2551,6 +2855,8 @@ Założenia i interpretacja działania:
 
         el.hoursSlider.addEventListener('input', function () {
           useCustomRange = false;
+          customRangeEndFollowsNow = false;
+          defaultStartFullRangeEnabled = false;
           currentRangeHours = parseInt(el.hoursSlider.value, 10);
           syncActiveRangeButtons();
           syncSliderLabel();
@@ -2558,10 +2864,8 @@ Założenia i interpretacja działania:
 
         el.hoursSlider.addEventListener('change', function () {
           chartUiRevision += 1;
-          const range = getActiveRange();
-          el.startDate.value = toLocalInputValue(range.start);
-          el.endDate.value = toLocalInputValue(range.end);
-          renderDashboard();
+          el.endDate.value = toLocalInputValue(new Date());
+          refreshDashboardFromCurrentSelection();
         });
 
         el.applyRangeBtn.addEventListener('click', function () {
@@ -2588,6 +2892,8 @@ Założenia i interpretacja działania:
         el.autoToggle.addEventListener('change', restartTimer);
         el.intervalSelect.addEventListener('change', restartTimer);
         el.refreshBtn.addEventListener('click', refreshDashboardFromCurrentSelection);
+        el.reset3dViewsBtn.addEventListener('click', resetAll3DViews);
+        el.toggleAll3dLegendsBtn.addEventListener('click', toggleAll3DLegends);
 
         el.overlayDaysSlider.addEventListener('input', function () {
           overlayCompareDays = parseInt(el.overlayDaysSlider.value, 10);
@@ -2685,7 +2991,9 @@ Założenia i interpretacja działania:
           updateLegendButtonText(button, chartId);
           button.addEventListener('click', function () {
             legendVisibleState[chartId] = !getLegendVisible(chartId);
+            all3dLegendsVisible = THREE_D_CHART_IDS.every(function (id) { return getLegendVisible(id); });
             updateLegendButtonText(button, chartId);
+            updateAll3DLegendButtonText();
             safePlotlyRelayout(chartId, { showlegend: getLegendVisible(chartId) });
           });
         });
@@ -2696,6 +3004,8 @@ Założenia i interpretacja działania:
           resizeTimer = setTimeout(resizeAllCharts, 180);
         });
 
+        updateAll3DLegendButtonText();
+        el.copyReportBtn.addEventListener('click', handleCopyReport);
         el.exportButton.addEventListener('click', handleExport);
       }
 
