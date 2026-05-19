@@ -341,6 +341,2294 @@ Założenia i interpretacja działania:
           <div id="progressTimes" class="status">Pobieranie: — | Overlay 3D: —</div>
           <div id="progressCounts" class="status">Próbki: sensor — | meteo —</div>
         </div>
+        <div id="debugInfo" class="info-line">Diagnostyka: oczekiwanie na uruchomienie.</div>
+      </div>
+    </section>
+
+    <section class="card chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">Sensor overlay 3D</div>
+          <div class="chart-subtitle">Tylko temperatura sensora, nakładka dobowa w 3D: X = dzień, Y = godzina, Z = temperatura</div>
+        </div>
+        <div class="overlay-controls">
+          <label for="sensorOverlay3dDaysSlider">Liczba dni:</label>
+          <input id="sensorOverlay3dDaysSlider" class="range-slider" type="range" min="1" max="1" step="1" value="1" style="width: 220px;" />
+          <div id="sensorOverlay3dDaysValue" class="status">1 dzień</div>
+          <label for="sensorOverlay3dProjection" style="margin-left: 8px;">Projekcja:</label>
+          <select id="sensorOverlay3dProjection" class="select">
+            <option value="perspective" selected>Perspektywiczna</option>
+            <option value="orthographic">Nieperspektywiczna</option>
+          </select>
+          <button class="btn" data-3d-chart="sensorOverlay3dChart" data-3d-legend="toggle">Ukryj legendę</button>
+          <button class="btn" data-3d-chart="sensorOverlay3dChart" data-3d-view="xz">Widok X-Z</button>
+          <button class="btn" data-3d-chart="sensorOverlay3dChart" data-3d-view="yz">Widok Y-Z</button>
+        </div>
+      </div>
+      <div class="plot-frame"><div id="sensorOverlay3dChart"></div></div>
+      <div id="sensorOverlay3dInfo" class="info-line">Oczekiwanie na dane...</div>
+    </section>
+
+    <section class="card chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">Sensor + meteo overlay 3D</div>
+          <div class="chart-subtitle">Kopia górnego overlayu 3D, ale bez kropek; na każdym dniu rysowane są linie sensora oraz meteo</div>
+        </div>
+        <div class="overlay-controls">
+          <label for="sensorMeteoOverlay3dDaysSlider">Liczba dni:</label>
+          <input id="sensorMeteoOverlay3dDaysSlider" class="range-slider" type="range" min="1" max="1" step="1" value="1" style="width: 220px;" />
+          <div id="sensorMeteoOverlay3dDaysValue" class="status">1 dzień</div>
+          <label for="sensorMeteoOverlay3dProjection" style="margin-left: 8px;">Projekcja:</label>
+          <select id="sensorMeteoOverlay3dProjection" class="select">
+            <option value="perspective" selected>Perspektywiczna</option>
+            <option value="orthographic">Nieperspektywiczna</option>
+          </select>
+          <button class="btn" data-3d-chart="sensorMeteoOverlay3dChart" data-3d-legend="toggle">Ukryj legendę</button>
+          <button class="btn" data-3d-chart="sensorMeteoOverlay3dChart" data-3d-view="xz">Widok X-Z</button>
+          <button class="btn" data-3d-chart="sensorMeteoOverlay3dChart" data-3d-view="yz">Widok Y-Z</button>
+        </div>
+      </div>
+      <div class="plot-frame"><div id="sensorMeteoOverlay3dChart"></div></div>
+      <div id="sensorMeteoOverlay3dInfo" class="info-line">Oczekiwanie na dane...</div>
+    </section>
+
+    <section class="card chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">Temperatura: sensor + Lublin + model (widok skupiony na sensorze)</div>
+          <div class="chart-subtitle">Lublin i model są ukryte domyślnie, ale można je włączyć z legendy</div>
+        </div>
+      </div>
+      <div class="plot-frame"><div id="mainChartSensorFocus"></div></div>
+      <div class="info-line">Domyślnie widoczna jest wyłącznie linia sensora.</div>
+    </section>
+
+    <section class="summary-grid">
+      <div class="card metric-card"><div class="metric-label">Sensor teraz</div><div id="currentTemp" class="metric-value">--.-- °C</div><div id="lastTime" class="metric-note">Ostatni punkt: —</div></div>
+      <div class="card metric-card"><div class="metric-label">Lublin teraz</div><div id="outsideTemp" class="metric-value">--.-- °C</div><div id="outsideInfo" class="metric-note">Dane zewnętrzne: —</div></div>
+      <div class="card metric-card"><div class="metric-label">Punkt rosy</div><div id="outsideDewPoint" class="metric-value">--.-- °C</div><div class="metric-note">Wyliczony z temperatury i RH</div></div>
+      <div class="card metric-card"><div class="metric-label">Wilgotność względna</div><div id="outsideRH" class="metric-value">--.-- %</div><div class="metric-note">Dane pogodowe dla Lublina</div></div>
+      <div class="card metric-card"><div class="metric-label">Wilgotność bezwzględna</div><div id="outsideAH" class="metric-value">--.-- g/m³</div><div class="metric-note">Wyliczona z temperatury i RH</div></div>
+      <div class="card metric-card"><div class="metric-label">Ciśnienie</div><div id="outsidePressure" class="metric-value">--.-- hPa</div><div class="metric-note">Ciśnienie zredukowane do poziomu morza</div></div>
+      <div class="card metric-card"><div class="metric-label">Wschód słońca</div><div id="sunriseValue" class="metric-value">--:--</div><div class="metric-note">Lublin, czas lokalny Polski</div></div>
+      <div class="card metric-card"><div class="metric-label">Zachód słońca</div><div id="sunsetValue" class="metric-value">--:--</div><div class="metric-note">Lublin, czas lokalny Polski</div></div>
+      <div class="card metric-card"><div class="metric-label">Ocena warunków</div><div id="comfortValue" class="metric-value">Brak danych</div><div id="comfortSub" class="metric-note">Panel pokaże orientacyjną ocenę po pobraniu danych.</div></div>
+      <div class="card metric-card"><div class="metric-label">Liczba punktów</div><div id="pointCountsSummary" class="metric-value">S: -- | L: --</div><div class="metric-note">S = sensor, L = Lublin</div></div>
+    </section>
+
+    <section class="main-grid">
+      <section class="card chart-card">
+        <div class="chart-head"><div><div class="chart-title">Temperatura: sensor + Lublin + model</div><div class="chart-subtitle">Linia modelu Lublina od początku zakresu aż w przyszłość</div></div></div>
+        <div class="plot-frame"><div id="mainChart"></div></div>
+      </section>
+      <section class="card side-card">
+        <div class="stack">
+          <div class="analysis-box"><div class="analysis-title">Sensor: minimum</div><div id="sensorMin" class="analysis-value">--</div><div class="analysis-sub">Najniższa wartość sensora w zakresie</div></div>
+          <div class="analysis-box"><div class="analysis-title">Lublin: minimum</div><div id="lublinMin" class="analysis-value">--</div><div class="analysis-sub">Najniższa temperatura zewnętrzna w zakresie</div></div>
+          <div class="analysis-box"><div class="analysis-title">Sensor: maksimum</div><div id="sensorMax" class="analysis-value">--</div><div class="analysis-sub">Najwyższa wartość sensora w zakresie</div></div>
+          <div class="analysis-box"><div class="analysis-title">Lublin: maksimum</div><div id="lublinMax" class="analysis-value">--</div><div class="analysis-sub">Najwyższa temperatura zewnętrzna w zakresie</div></div>
+          <div class="analysis-box"><div class="analysis-title">Sensor: średnia / amplituda</div><div id="sensorAvg" class="analysis-value">--</div><div id="sensorAmplitude" class="analysis-sub">--</div></div>
+          <div class="analysis-box"><div class="analysis-title">Lublin: średnia / amplituda</div><div id="lublinAvg" class="analysis-value">--</div><div id="lublinAmplitude" class="analysis-sub">--</div></div>
+          <div class="analysis-box"><div class="analysis-title">Sensor: trend</div><div id="sensorTrend" class="analysis-value">--</div><div id="sensorTrendNote" class="analysis-sub">Brak danych.</div></div>
+          <div class="analysis-box"><div class="analysis-title">Lublin: trend</div><div id="lublinTrend" class="analysis-value">--</div><div id="lublinTrendNote" class="analysis-sub">Brak danych.</div></div>
+          <div class="analysis-box"><div class="analysis-title">Punkty sensora</div><div id="sensorPointCount" class="analysis-value">--</div><div class="analysis-sub">Punkty po przetworzeniu do wykresu</div></div>
+          <div class="analysis-box"><div class="analysis-title">Punkty Lublina</div><div id="lublinPointCount" class="analysis-value">--</div><div class="analysis-sub">Punkty historyczne meteo w zakresie</div></div>
+        </div>
+      </section>
+    </section>
+
+    <section class="main-grid">
+      <section class="card chart-card">
+        <div class="chart-head"><div><div class="chart-title">Histogram temperatury sensora</div><div class="chart-subtitle">Rozkład wartości dla tego samego okresu</div></div></div>
+        <div class="plot-frame"><div id="histChart"></div></div>
+      </section>
+      <section class="card chart-card">
+        <div class="chart-head"><div><div class="chart-title">Meteo Lublin</div><div class="chart-subtitle">RH, AH, punkt rosy i ciśnienie</div></div></div>
+        <div class="plot-frame"><div id="meteoChart"></div></div>
+      </section>
+    </section>
+
+    <section class="main-grid">
+      <section class="card chart-card">
+        <div class="chart-head">
+          <div><div class="chart-title">Overlay dni: sensor + Lublin</div><div class="chart-subtitle">Porównanie przebiegów dobowych</div></div>
+          <div class="overlay-controls"><label for="overlayDaysSlider">Liczba dni:</label><input id="overlayDaysSlider" class="range-slider" type="range" min="1" max="7" step="1" value="7" style="width: 220px;" /><div id="overlayDaysValue" class="status">7 dni</div></div>
+        </div>
+        <div class="plot-frame"><div id="overlayChart"></div></div>
+      </section>
+      <section class="card chart-card">
+        <div class="chart-head"><div><div class="chart-title">Wykres Moliera 2D</div><div class="chart-subtitle">Aktualny punkt meteo dla Lublina</div></div></div>
+        <div class="plot-frame"><div id="mollierChart"></div></div>
+      </section>
+    </section>
+
+    <section class="card chart-card">
+      <div class="chart-head">
+        <div><div class="chart-title">Wykres Moliera 3D</div><div class="chart-subtitle">X = temperatura sucha, Y = czas, Z = entalpia, powierzchnie RH + trajektoria danych</div></div>
+        <div class="overlay-controls">
+          <button class="btn" data-3d-chart="mollier3dChart" data-3d-legend="toggle">Ukryj legendę</button>
+          <button class="btn" data-3d-chart="mollier3dChart" data-3d-view="xz">Widok X-Z</button>
+          <button class="btn" data-3d-chart="mollier3dChart" data-3d-view="yz">Widok Y-Z</button>
+        </div>
+      </div>
+      <div class="plot-frame"><div id="mollier3dChart"></div></div>
+      <div id="mollier3dInfo" class="info-line">Oczekiwanie na dane...</div>
+    </section>
+
+    <section class="card chart-card">
+      <div class="chart-head">
+        <div><div class="chart-title">Sensor overlay 3D – pełny zbiór danych</div><div class="chart-subtitle">Osobny pełny zbiór danych z sensora, wykres liniowy bez kropek, domyślnie 7 dni</div></div>
+        <div class="overlay-controls">
+          <label for="sensorOverlay3dFullDaysSlider">Liczba dni:</label>
+          <input id="sensorOverlay3dFullDaysSlider" class="range-slider" type="range" min="1" max="7" step="1" value="7" style="width: 220px;" />
+          <div id="sensorOverlay3dFullDaysValue" class="status">7 dni</div>
+          <label for="sensorOverlay3dFullProjection" style="margin-left: 8px;">Projekcja:</label>
+          <select id="sensorOverlay3dFullProjection" class="select">
+            <option value="perspective" selected>Perspektywiczna</option>
+            <option value="orthographic">Nieperspektywiczna</option>
+          </select>
+          <button class="btn" data-3d-chart="sensorOverlay3dFullChart" data-3d-legend="toggle">Ukryj legendę</button>
+          <button class="btn" data-3d-chart="sensorOverlay3dFullChart" data-3d-view="xz">Widok X-Z</button>
+          <button class="btn" data-3d-chart="sensorOverlay3dFullChart" data-3d-view="yz">Widok Y-Z</button>
+        </div>
+      </div>
+      <div class="plot-frame"><div id="sensorOverlay3dFullChart"></div></div>
+      <div id="sensorOverlay3dFullInfo" class="info-line">Oczekiwanie na dane...</div>
+    </section>
+
+    <section class="card chart-card">
+      <div class="chart-head">
+        <div><div class="chart-title">Meteo overlay 3D</div><div class="chart-subtitle">Temperatura z meteo, nakładka dobowa w 3D: X = dzień, Y = godzina, Z = temperatura</div></div>
+        <div class="overlay-controls">
+          <label for="meteoOverlay3dDaysSlider">Liczba dni:</label>
+          <input id="meteoOverlay3dDaysSlider" class="range-slider" type="range" min="1" max="1" step="1" value="1" style="width: 220px;" />
+          <div id="meteoOverlay3dDaysValue" class="status">1 dzień</div>
+          <label for="meteoOverlay3dProjection" style="margin-left: 8px;">Projekcja:</label>
+          <select id="meteoOverlay3dProjection" class="select">
+            <option value="perspective" selected>Perspektywiczna</option>
+            <option value="orthographic">Nieperspektywiczna</option>
+          </select>
+          <button class="btn" data-3d-chart="meteoOverlay3dChart" data-3d-legend="toggle">Ukryj legendę</button>
+          <button class="btn" data-3d-chart="meteoOverlay3dChart" data-3d-view="xz">Widok X-Z</button>
+          <button class="btn" data-3d-chart="meteoOverlay3dChart" data-3d-view="yz">Widok Y-Z</button>
+        </div>
+      </div>
+      <div class="plot-frame"><div id="meteoOverlay3dChart"></div></div>
+      <div id="meteoOverlay3dInfo" class="info-line">Oczekiwanie na dane...</div>
+    </section>
+
+    <section class="card chart-card">
+      <div class="chart-head">
+        <div><div class="chart-title">Eksport danych</div><div class="chart-subtitle">Możesz pobrać bieżący zakres albo pełny zbiór sensora</div></div>
+        <div class="overlay-controls">
+          <label for="exportDatasetSelect">Zbiór:</label>
+          <select id="exportDatasetSelect" class="select">
+            <option value="current_sensor" selected>Bieżący zakres sensora</option>
+            <option value="full_sensor">Pełny zbiór sensora</option>
+            <option value="current_combo">Bieżący zakres sensora + Lublin</option>
+          </select>
+          <label for="exportFormatSelect">Format:</label>
+          <select id="exportFormatSelect" class="select">
+            <option value="csv" selected>CSV</option>
+            <option value="xlsx">XLSX</option>
+          </select>
+        </div>
+      </div>
+      <div style="padding: 8px 6px 12px 6px;"><button id="exportButton" class="btn btn-big">Pobierz dane</button></div>
+      <div id="exportInfo" class="info-line">Eksport używa ostatnio pobranych danych. XLSX działa dzięki bibliotece SheetJS.</div>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const CHANNEL_ID = 3317976;
+      const READ_API_KEY = '5X3O3RVY2FIIBGXO';
+      const FIELD = 1;
+      const MAX_POINTS = 1800;
+      const FULL_SENSOR_MAX_POINTS = 24000;
+      const THINGSPEAK_CHUNK_HOURS = 24;
+      const FUTURE_FORECAST_DAYS = 3;
+      const RH_SURFACES = [20, 40, 60, 80, 100];
+      const DEFAULT_TEMP_AXIS_MIN = -40;
+      const DEFAULT_TEMP_AXIS_MAX = 10;
+      const AXIS_DATA_COVERAGE_TARGET = 0.8;
+      const DEFAULT_START_DATE_STR = '2026-03-29T00:00';
+      const METEO_PAST_DAYS_LIMIT = 92;
+      const METEO_FORECAST_DAYS_LIMIT = 16;
+      const DAY_MS = 24 * 60 * 60 * 1000;
+
+      window.addEventListener('error', function (event) {
+        console.error('Błąd wykonania skryptu:', event.message, event.error || event.filename || 'brak szczegółów');
+      });
+
+      window.addEventListener('unhandledrejection', function (event) {
+        console.error('Nieobsłużony błąd asynchroniczny:', event.reason);
+      });
+
+      let currentRangeHours = 8;
+      let useCustomRange = false;
+      let refreshTimer = null;
+      let lublinGeo = null;
+      let chartUiRevision = 0;
+
+      let sensor3dOverlayDays = 3;
+      let sensorAvailableDaysMax = 1;
+      let sensorOldestTimestampCache = null;
+      let sensor3dOverlayAutoMaxPending = true;
+      let sensor3dProjectionMode = 'perspective';
+      let sensor3dShowDots = false;
+
+      let meteo3dOverlayDays = 3;
+      let meteoAvailableDaysMax = 1;
+      let meteo3dOverlayAutoMaxPending = true;
+      let meteo3dProjectionMode = 'perspective';
+
+      let sensorMeteo3dOverlayDays = 3;
+      let sensorMeteoAvailableDaysMax = 1;
+      let sensorMeteo3dOverlayAutoMaxPending = true;
+      let sensorMeteo3dProjectionMode = 'perspective';
+
+      let overlayCompareDays = 7;
+      let overlayCompareDaysMax = 7;
+
+      let sensor3dFullOverlayDays = 7;
+      let sensorFullAvailableDaysMax = 7;
+      let sensor3dFullProjectionMode = 'perspective';
+      let fullSensorCacheData = null;
+      let fullSensorCacheTs = 0;
+
+      let currentSensorPrepared3D = null;
+      let currentMeteoPrepared3D = null;
+      let fullSensorPrepared3D = null;
+      let fullCombinedPrepared3D = null;
+      let currentSensorMeteoPrepared3D = null;
+      const sceneViewState = {
+        sensorOverlay3dChart: 'iso',
+        sensorMeteoOverlay3dChart: 'iso',
+        mollier3dChart: 'iso',
+        sensorOverlay3dFullChart: 'iso',
+        meteoOverlay3dChart: 'iso'
+      };
+
+      const legendVisibleState = {
+        sensorOverlay3dChart: true,
+        sensorMeteoOverlay3dChart: true,
+        mollier3dChart: true,
+        sensorOverlay3dFullChart: true,
+        meteoOverlay3dChart: true
+      };
+
+      let lastCurrentSensorData = { x: [], y: [] };
+      let lastCurrentLublinData = { x: [], temp: [] };
+
+      function byId(id) {
+        return document.getElementById(id);
+      }
+
+      const el = {
+        status: byId('status'),
+        autoToggle: byId('autoToggle'),
+        intervalSelect: byId('intervalSelect'),
+        refreshBtn: byId('refreshBtn'),
+        hoursSlider: byId('hoursSlider'),
+        sliderHoursValue: byId('sliderHoursValue'),
+        overlayDaysSlider: byId('overlayDaysSlider'),
+        overlayDaysValue: byId('overlayDaysValue'),
+        startDate: byId('startDate'),
+        endDate: byId('endDate'),
+        applyRangeBtn: byId('applyRangeBtn'),
+        resetRangeBtn: byId('resetRangeBtn'),
+        currentTemp: byId('currentTemp'),
+        lastTime: byId('lastTime'),
+        outsideTemp: byId('outsideTemp'),
+        outsideInfo: byId('outsideInfo'),
+        outsideRH: byId('outsideRH'),
+        outsideAH: byId('outsideAH'),
+        outsidePressure: byId('outsidePressure'),
+        outsideDewPoint: byId('outsideDewPoint'),
+        sunriseValue: byId('sunriseValue'),
+        sunsetValue: byId('sunsetValue'),
+        comfortValue: byId('comfortValue'),
+        comfortSub: byId('comfortSub'),
+        pointCountsSummary: byId('pointCountsSummary'),
+        mollier3dInfo: byId('mollier3dInfo'),
+        debugInfo: byId('debugInfo'),
+        sensorOverlay3dDaysSlider: byId('sensorOverlay3dDaysSlider'),
+        sensorOverlay3dDaysValue: byId('sensorOverlay3dDaysValue'),
+        sensorOverlay3dProjection: byId('sensorOverlay3dProjection'),
+        sensorOverlay3dInfo: byId('sensorOverlay3dInfo'),
+        sensorMeteoOverlay3dDaysSlider: byId('sensorMeteoOverlay3dDaysSlider'),
+        sensorMeteoOverlay3dDaysValue: byId('sensorMeteoOverlay3dDaysValue'),
+        sensorMeteoOverlay3dProjection: byId('sensorMeteoOverlay3dProjection'),
+        sensorMeteoOverlay3dInfo: byId('sensorMeteoOverlay3dInfo'),
+        sensorOverlay3dFullDaysSlider: byId('sensorOverlay3dFullDaysSlider'),
+        sensorOverlay3dFullDaysValue: byId('sensorOverlay3dFullDaysValue'),
+        sensorOverlay3dFullProjection: byId('sensorOverlay3dFullProjection'),
+        sensorOverlay3dFullInfo: byId('sensorOverlay3dFullInfo'),
+        meteoOverlay3dDaysSlider: byId('meteoOverlay3dDaysSlider'),
+        meteoOverlay3dDaysValue: byId('meteoOverlay3dDaysValue'),
+        meteoOverlay3dProjection: byId('meteoOverlay3dProjection'),
+        meteoOverlay3dInfo: byId('meteoOverlay3dInfo'),
+        exportDatasetSelect: byId('exportDatasetSelect'),
+        exportFormatSelect: byId('exportFormatSelect'),
+        exportButton: byId('exportButton'),
+        exportInfo: byId('exportInfo'),
+        progressFill: byId('progressFill'),
+        progressText: byId('progressText'),
+        progressTimes: byId('progressTimes'),
+        progressCounts: byId('progressCounts'),
+        sensorMin: byId('sensorMin'),
+        sensorMax: byId('sensorMax'),
+        sensorAvg: byId('sensorAvg'),
+        sensorAmplitude: byId('sensorAmplitude'),
+        sensorTrend: byId('sensorTrend'),
+        sensorTrendNote: byId('sensorTrendNote'),
+        sensorPointCount: byId('sensorPointCount'),
+        lublinMin: byId('lublinMin'),
+        lublinMax: byId('lublinMax'),
+        lublinAvg: byId('lublinAvg'),
+        lublinAmplitude: byId('lublinAmplitude'),
+        lublinTrend: byId('lublinTrend'),
+        lublinTrendNote: byId('lublinTrendNote'),
+        lublinPointCount: byId('lublinPointCount')
+      };
+
+      function assertElements() {
+        const required = Object.keys(el);
+        const missing = required.filter(function (k) { return !el[k]; });
+        if (missing.length) {
+          throw new Error('Brakuje elementów DOM: ' + missing.join(', '));
+        }
+      }
+
+      function formatHoursLabel(hours) {
+        const days = hours / 24;
+        return hours + ' h (' + days.toFixed(2) + ' dni)';
+      }
+
+      function formatThingSpeakDateUTC(date) {
+        const y = date.getUTCFullYear();
+        const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(date.getUTCDate()).padStart(2, '0');
+        const hh = String(date.getUTCHours()).padStart(2, '0');
+        const mm = String(date.getUTCMinutes()).padStart(2, '0');
+        const ss = String(date.getUTCSeconds()).padStart(2, '0');
+        return y + '-' + m + '-' + d + ' ' + hh + ':' + mm + ':' + ss;
+      }
+
+      function formatDateForApiUTC(date) {
+        const y = date.getUTCFullYear();
+        const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(date.getUTCDate()).padStart(2, '0');
+        return y + '-' + m + '-' + d;
+      }
+
+      function toLocalInputValue(date) {
+        const pad = function (n) { return String(n).padStart(2, '0'); };
+        return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+      }
+
+      function formatDateTime(dateOrString) {
+        const date = dateOrString instanceof Date ? dateOrString : new Date(dateOrString);
+        return date.toLocaleString('pl-PL');
+      }
+
+      function formatTimePL(dateOrString) {
+        const date = dateOrString instanceof Date ? dateOrString : new Date(dateOrString);
+        return date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+      }
+
+      function formatDaysText(days) {
+        return days === 1 ? '1 dzień' : days + ' dni';
+      }
+
+      function formatDurationMs(ms) {
+        if (!Number.isFinite(ms)) return '—';
+        if (ms < 1000) return Math.round(ms) + ' ms';
+        return (ms / 1000).toFixed(2) + ' s';
+      }
+
+      function setProgress(percent, text) {
+        const safe = Math.max(0, Math.min(100, percent));
+        el.progressFill.style.width = safe.toFixed(1) + '%';
+        el.progressText.textContent = text;
+      }
+
+      function setProgressTimes(fetchMs, overlayMs) {
+        el.progressTimes.textContent = 'Pobieranie: ' + formatDurationMs(fetchMs) + ' | Overlay 3D: ' + formatDurationMs(overlayMs);
+      }
+
+      function setProgressCounts(sensorCount, meteoCount) {
+        const sensorText = Number.isFinite(sensorCount) ? sensorCount : '—';
+        const meteoText = Number.isFinite(meteoCount) ? meteoCount : '—';
+        el.progressCounts.textContent = 'Próbki: sensor ' + sensorText + ' | meteo ' + meteoText;
+      }
+
+      function getActiveRange() {
+        if (useCustomRange && el.startDate.value && el.endDate.value) {
+          return { start: new Date(el.startDate.value), end: new Date(el.endDate.value) };
+        }
+        const end = new Date();
+        const start = new Date(end.getTime() - currentRangeHours * 60 * 60 * 1000);
+        return { start: start, end: end };
+      }
+
+      function downsample(xArr, yArr, maxPoints) {
+        const n = xArr.length;
+        if (n <= maxPoints) return { x: xArr, y: yArr };
+        const step = Math.ceil(n / maxPoints);
+        const x = [];
+        const y = [];
+        for (let i = 0; i < n; i += step) {
+          x.push(xArr[i]);
+          y.push(yArr[i]);
+        }
+        return { x: x, y: y };
+      }
+
+      function getFiniteNumbers(values) {
+        if (!Array.isArray(values)) return [];
+        const out = [];
+        for (let i = 0; i < values.length; i++) {
+          const n = Number(values[i]);
+          if (Number.isFinite(n)) out.push(n);
+        }
+        return out;
+      }
+
+      function computePaddedYRange(values) {
+        const finite = getFiniteNumbers(values);
+        if (!finite.length) return null;
+        let minVal = finite[0];
+        let maxVal = finite[0];
+        for (let i = 1; i < finite.length; i++) {
+          if (finite[i] < minVal) minVal = finite[i];
+          if (finite[i] > maxVal) maxVal = finite[i];
+        }
+        const span = Math.max(maxVal - minVal, 0.3);
+        const pad = span * 0.08;
+        return [minVal - pad, maxVal + pad];
+      }
+
+      function calculateStats(values) {
+        const finite = getFiniteNumbers(values);
+        if (!finite.length) return null;
+        let min = finite[0];
+        let max = finite[0];
+        let sum = finite[0];
+        for (let i = 1; i < finite.length; i++) {
+          const v = finite[i];
+          if (v < min) min = v;
+          if (v > max) max = v;
+          sum += v;
+        }
+        const avg = sum / finite.length;
+        const amplitude = max - min;
+        const trend = finite[finite.length - 1] - finite[0];
+        return { min: min, max: max, avg: avg, amplitude: amplitude, trend: trend };
+      }
+
+      function evaluateComfort(temp) {
+        if (temp == null || Number.isNaN(temp)) return { label: 'Brak danych', sub: 'Nie udało się wyznaczyć oceny zakresu.' };
+        if (temp < 17.0) return { label: 'Za chłodno', sub: 'Temperatura jest raczej niska. Do snu może być zbyt zimno.' };
+        if (temp >= 17.0 && temp <= 19.5) return { label: 'Bardzo dobry zakres', sub: 'Zakres zwykle uznawany za korzystny dla snu i odpoczynku.' };
+        if (temp > 19.5 && temp <= 22.5) return { label: 'Dobry / neutralny zakres', sub: 'Temperatura wygląda rozsądnie, ale warto obserwować własny komfort.' };
+        if (temp > 22.5 && temp <= 25.0) return { label: 'Dość ciepło', sub: 'Może być odczuwalne jako zbyt ciepłe, zwłaszcza przy śnie.' };
+        return { label: 'Za ciepło', sub: 'Wysoka temperatura może pogarszać zasypianie i jakość snu.' };
+      }
+
+      function formatTrend(trend) {
+        const abs = Math.abs(trend).toFixed(3);
+        if (trend > 0.02) return { text: '↑ ' + abs + ' °C', cls: 'up', note: 'Temperatura rośnie w obrębie wybranego zakresu.' };
+        if (trend < -0.02) return { text: '↓ ' + abs + ' °C', cls: 'down', note: 'Temperatura spada w obrębie wybranego zakresu.' };
+        return { text: '→ ' + abs + ' °C', cls: 'flat', note: 'Temperatura jest względnie stabilna w obrębie wybranego zakresu.' };
+      }
+
+      function deduplicateByTime(xArr, yArr) {
+        const map = new Map();
+        for (let i = 0; i < xArr.length; i++) map.set(xArr[i].getTime(), yArr[i]);
+        const times = Array.from(map.keys()).sort(function (a, b) { return a - b; });
+        return { x: times.map(function (t) { return new Date(t); }), y: times.map(function (t) { return map.get(t); }) };
+      }
+
+      function filterByRange(xArr, yArr, startDate, endDate) {
+        const x = [];
+        const y = [];
+        const startMs = startDate.getTime();
+        const endMs = endDate.getTime();
+        for (let i = 0; i < xArr.length; i++) {
+          const t = xArr[i].getTime();
+          if (t >= startMs && t <= endMs) {
+            x.push(xArr[i]);
+            y.push(yArr[i]);
+          }
+        }
+        return { x: x, y: y };
+      }
+
+      function calculateAbsoluteHumidity(tempC, rhPercent) {
+        if (!Number.isFinite(tempC) || !Number.isFinite(rhPercent)) return null;
+        const saturationVaporPressure = 6.112 * Math.exp((17.67 * tempC) / (tempC + 243.5));
+        const vaporPressure = (rhPercent / 100.0) * saturationVaporPressure;
+        return 216.7 * (vaporPressure / (tempC + 273.15));
+      }
+
+      function calculateDewPoint(tempC, rhPercent) {
+        if (!Number.isFinite(tempC) || !Number.isFinite(rhPercent) || rhPercent <= 0) return null;
+        const a = 17.27;
+        const b = 237.7;
+        const gamma = ((a * tempC) / (b + tempC)) + Math.log(rhPercent / 100.0);
+        return (b * gamma) / (a - gamma);
+      }
+
+      function calculateHumidityRatio(tempC, rhPercent, pressureHpa) {
+        const p = Number.isFinite(pressureHpa) ? pressureHpa : 1013.25;
+        if (!Number.isFinite(tempC) || !Number.isFinite(rhPercent) || !Number.isFinite(p)) return null;
+        const pws = 6.112 * Math.exp((17.67 * tempC) / (tempC + 243.5));
+        const pw = (rhPercent / 100.0) * pws;
+        return 0.62198 * pw / (p - pw);
+      }
+
+      function calculateEnthalpy(tempC, humidityRatioKgKg) {
+        if (!Number.isFinite(tempC) || !Number.isFinite(humidityRatioKgKg)) return null;
+        return 1.006 * tempC + humidityRatioKgKg * (2501 + 1.86 * tempC);
+      }
+
+      async function fetchJson(url, label) {
+        const response = await fetch(url);
+        const text = await response.text();
+        if (!response.ok) {
+          throw new Error((label || 'Żądanie') + ': HTTP ' + response.status + ' | ' + text.slice(0, 180));
+        }
+        try {
+          return JSON.parse(text);
+        } catch (error) {
+          throw new Error((label || 'Żądanie') + ': odpowiedź nie jest poprawnym JSON. Początek odpowiedzi: ' + text.slice(0, 180));
+        }
+      }
+
+      function isValidDate(date) {
+        return date instanceof Date && !Number.isNaN(date.getTime());
+      }
+
+      async function fetchThingSpeakRange(startDate, endDate, maxPoints, progressCallback) {
+        const pointsLimit = typeof maxPoints === 'number' ? maxPoints : MAX_POINTS;
+        const allX = [];
+        const allY = [];
+        let chunkStart = new Date(startDate.getTime());
+        const chunkMs = THINGSPEAK_CHUNK_HOURS * 60 * 60 * 1000;
+        const totalChunks = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / chunkMs));
+        let completedChunks = 0;
+
+        if (progressCallback) progressCallback(completedChunks, totalChunks, 'fetch', 0);
+
+        while (chunkStart < endDate) {
+          const chunkEnd = new Date(Math.min(chunkStart.getTime() + chunkMs, endDate.getTime()));
+          let url = 'https://api.thingspeak.com/channels/' + CHANNEL_ID + '/fields/' + FIELD + '.json?start=' + encodeURIComponent(formatThingSpeakDateUTC(chunkStart)) + '&end=' + encodeURIComponent(formatThingSpeakDateUTC(chunkEnd)) + '&results=8000';
+          if (READ_API_KEY && READ_API_KEY.length > 0) url += '&api_key=' + READ_API_KEY;
+
+          const data = await fetchJson(url, 'ThingSpeak');
+          const feeds = data && data.feeds ? data.feeds : [];
+
+          for (let i = 0; i < feeds.length; i++) {
+            const feed = feeds[i];
+            if (feed.field1 !== null && feed.field1 !== undefined) {
+              const parsedValue = parseFloat(feed.field1);
+              const pointDate = new Date(feed.created_at);
+              if (Number.isFinite(parsedValue) && isValidDate(pointDate)) {
+                allX.push(pointDate);
+                allY.push(parsedValue);
+              }
+            }
+          }
+
+          completedChunks += 1;
+          if (progressCallback) progressCallback(completedChunks, totalChunks, 'fetch', allY.length);
+          chunkStart = new Date(chunkEnd.getTime() + 1000);
+        }
+
+        if (progressCallback) progressCallback(totalChunks, totalChunks, 'processing', allY.length);
+        const deduped = deduplicateByTime(allX, allY);
+        const filtered = filterByRange(deduped.x, deduped.y, startDate, endDate);
+        if (progressCallback) progressCallback(totalChunks, totalChunks, 'finalizing', filtered.y.length);
+        const result = downsample(filtered.x, filtered.y, pointsLimit);
+        if (progressCallback) progressCallback(totalChunks, totalChunks, 'done', result.y.length);
+        return result;
+      }
+
+      async function fetchSensorOldestTimestampApprox() {
+        if (sensorOldestTimestampCache) return sensorOldestTimestampCache;
+        const ancientStart = encodeURIComponent('2000-01-01 00:00:00');
+        const url = 'https://api.thingspeak.com/channels/' + CHANNEL_ID + '/fields/' + FIELD + '.json?start=' + ancientStart + '&results=1' + (READ_API_KEY ? '&api_key=' + READ_API_KEY : '');
+        const data = await fetchJson(url, 'ThingSpeak najstarszy punkt');
+
+        if (data && data.feeds && data.feeds.length && data.feeds[0] && data.feeds[0].created_at) {
+          sensorOldestTimestampCache = new Date(data.feeds[0].created_at);
+          return sensorOldestTimestampCache;
+        }
+
+        const fallbackUrl = 'https://api.thingspeak.com/channels/' + CHANNEL_ID + '.json' + (READ_API_KEY ? '?api_key=' + READ_API_KEY : '');
+        const fallbackData = await fetchJson(fallbackUrl, 'ThingSpeak metadane kanału');
+        sensorOldestTimestampCache = fallbackData && fallbackData.created_at ? new Date(fallbackData.created_at) : new Date();
+        return sensorOldestTimestampCache;
+      }
+
+      async function fetchFullSensorDataset(force, progressCallback) {
+        const useForce = !!force;
+        const nowMs = Date.now();
+        const cacheIsFresh = fullSensorCacheData && (nowMs - fullSensorCacheTs < 5 * 60 * 1000);
+        if (!useForce && cacheIsFresh) {
+          if (progressCallback) progressCallback(1, 1, true, 'done', fullSensorCacheData && fullSensorCacheData.y ? fullSensorCacheData.y.length : 0);
+          return fullSensorCacheData;
+        }
+
+        const defaultStart = new Date(DEFAULT_START_DATE_STR);
+        const now = new Date();
+        const data = await fetchThingSpeakRange(defaultStart, now, FULL_SENSOR_MAX_POINTS, progressCallback ? function (done, total, phase, count) {
+          progressCallback(done, total, false, phase, count);
+        } : null);
+
+        fullSensorCacheData = data;
+        fullSensorCacheTs = nowMs;
+        return data;
+      }
+
+      async function getLublinGeo() {
+        if (lublinGeo) return lublinGeo;
+        const url = 'https://geocoding-api.open-meteo.com/v1/search?name=Lublin&count=1&language=pl&format=json';
+        const data = await fetchJson(url, 'Geokodowanie Lublina');
+        if (!data || !data.results || !data.results.length) throw new Error('Nie znaleziono Lublina.');
+        lublinGeo = { latitude: data.results[0].latitude, longitude: data.results[0].longitude };
+        return lublinGeo;
+      }
+
+      async function fetchLublinCurrent() {
+        const geo = await getLublinGeo();
+        const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + geo.latitude + '&longitude=' + geo.longitude + '&current=temperature_2m,relative_humidity_2m,pressure_msl&timezone=GMT';
+        const data = await fetchJson(url, 'Open-Meteo aktualne dane');
+        const current = data && data.current ? data.current : {};
+        const temp = current.temperature_2m;
+        const rh = current.relative_humidity_2m;
+        const pressure = current.pressure_msl;
+        return {
+          currentTemp: temp,
+          currentRH: rh,
+          currentPressure: pressure,
+          currentAH: calculateAbsoluteHumidity(temp, rh),
+          currentDewPoint: calculateDewPoint(temp, rh),
+          currentTime: current.time ? new Date(current.time + 'Z') : null
+        };
+      }
+
+      async function fetchLublinHistory(startDate, endDate) {
+        const geo = await getLublinGeo();
+        const now = new Date();
+        const safeStart = startDate < new Date(now.getTime() - METEO_PAST_DAYS_LIMIT * DAY_MS)
+          ? new Date(now.getTime() - METEO_PAST_DAYS_LIMIT * DAY_MS)
+          : startDate;
+        const requestedPastDays = Math.ceil(Math.max(0, now.getTime() - safeStart.getTime()) / DAY_MS) + 1;
+        const requestedFutureDays = Math.ceil(Math.max(0, endDate.getTime() - now.getTime()) / DAY_MS) + 1;
+        const pastDays = Math.max(1, Math.min(METEO_PAST_DAYS_LIMIT, requestedPastDays));
+        const forecastDays = Math.max(1, Math.min(METEO_FORECAST_DAYS_LIMIT, requestedFutureDays));
+        const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + geo.latitude + '&longitude=' + geo.longitude + '&hourly=temperature_2m,relative_humidity_2m,pressure_msl&past_days=' + pastDays + '&forecast_days=' + forecastDays + '&timezone=GMT';
+        const data = await fetchJson(url, 'Open-Meteo historia/prognoza godzinowa');
+        const hourly = data && data.hourly ? data.hourly : {};
+        const rawTimes = hourly.time || [];
+        const temps = hourly.temperature_2m || [];
+        const rhs = hourly.relative_humidity_2m || [];
+        const pressures = hourly.pressure_msl || [];
+
+        const filteredTime = [];
+        const filteredTemp = [];
+        const filteredRH = [];
+        const filteredAH = [];
+        const filteredPressure = [];
+        const filteredDewPoint = [];
+        const startMs = startDate.getTime();
+        const endMs = endDate.getTime();
+
+        for (let i = 0; i < rawTimes.length; i++) {
+          const time = new Date(rawTimes[i] + 'Z');
+          const ms = time.getTime();
+          const temp = Number(temps[i]);
+          const rh = Number(rhs[i]);
+          const pressure = Number(pressures[i]);
+          if (ms >= startMs && ms <= endMs && isValidDate(time) && Number.isFinite(temp)) {
+            const safeRh = Number.isFinite(rh) ? rh : null;
+            const safePressure = Number.isFinite(pressure) ? pressure : 1013.25;
+            filteredTime.push(time);
+            filteredTemp.push(temp);
+            filteredRH.push(safeRh);
+            filteredAH.push(calculateAbsoluteHumidity(temp, safeRh));
+            filteredPressure.push(safePressure);
+            filteredDewPoint.push(calculateDewPoint(temp, safeRh));
+          }
+        }
+
+        return { x: filteredTime, temp: filteredTemp, rh: filteredRH, ah: filteredAH, pressure: filteredPressure, dewPoint: filteredDewPoint };
+      }
+
+      async function fetchLublinModelLine(startDate, endDate) {
+        const geo = await getLublinGeo();
+        const now = new Date();
+        const msBack = Math.max(0, now.getTime() - startDate.getTime());
+        const daysBack = Math.max(1, Math.min(METEO_PAST_DAYS_LIMIT, Math.ceil(msBack / DAY_MS) + 1));
+        const msForward = Math.max(0, endDate.getTime() - now.getTime());
+        const daysForwardFromRange = Math.ceil(msForward / DAY_MS) + 1;
+        const forecastDays = Math.max(FUTURE_FORECAST_DAYS, Math.min(METEO_FORECAST_DAYS_LIMIT, daysForwardFromRange));
+        const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + geo.latitude + '&longitude=' + geo.longitude + '&hourly=temperature_2m&past_days=' + daysBack + '&forecast_days=' + forecastDays + '&timezone=GMT';
+        const data = await fetchJson(url, 'Open-Meteo linia modelu');
+        const hourly = data && data.hourly ? data.hourly : {};
+        const rawTimes = hourly.time || [];
+        const rawTemps = hourly.temperature_2m || [];
+        const x = [];
+        const temp = [];
+        for (let i = 0; i < rawTimes.length; i++) {
+          const d = new Date(rawTimes[i] + 'Z');
+          const v = Number(rawTemps[i]);
+          if (isValidDate(d) && Number.isFinite(v)) {
+            x.push(d);
+            temp.push(v);
+          }
+        }
+        return { x: x, temp: temp };
+      }
+
+      async function fetchLublinSunDaily() {
+        const geo = await getLublinGeo();
+        const today = new Date();
+        const localDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const tomorrow = new Date(localDate.getTime() + 24 * 60 * 60 * 1000);
+        const pad = function (n) { return String(n).padStart(2, '0'); };
+        const startDate = localDate.getFullYear() + '-' + pad(localDate.getMonth() + 1) + '-' + pad(localDate.getDate());
+        const endDate = tomorrow.getFullYear() + '-' + pad(tomorrow.getMonth() + 1) + '-' + pad(tomorrow.getDate());
+        const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + geo.latitude + '&longitude=' + geo.longitude + '&daily=sunrise,sunset&timezone=Europe/Warsaw&start_date=' + startDate + '&end_date=' + endDate;
+        const data = await fetchJson(url, 'Open-Meteo wschód/zachód słońca');
+        const daily = data && data.daily ? data.daily : {};
+        return { sunrise: daily.sunrise ? daily.sunrise[0] : null, sunset: daily.sunset ? daily.sunset[0] : null };
+      }
+
+      function updateCurrentMetric(elRef, value, suffix) {
+        elRef.textContent = value == null || Number.isNaN(value) ? '--.-- ' + suffix : Number(value).toFixed(2) + ' ' + suffix;
+      }
+
+      function updateAnalysisPanel(sensorData, lublinHistory, outsideCurrent, sunDaily) {
+        const sensorX = sensorData.x;
+        const sensorY = sensorData.y;
+        const lublinY = lublinHistory.temp;
+
+        if (!sensorX.length || !sensorY.length) {
+          el.currentTemp.textContent = '--.-- °C';
+          el.lastTime.textContent = 'Ostatni punkt: —';
+          el.comfortValue.textContent = 'Brak danych';
+          el.comfortSub.textContent = 'Panel pokaże orientacyjną ocenę po pobraniu danych.';
+        } else {
+          const currentTemp = sensorY[sensorY.length - 1];
+          el.currentTemp.textContent = currentTemp.toFixed(2) + ' °C';
+          el.lastTime.textContent = 'Ostatni punkt: ' + formatDateTime(sensorX[sensorX.length - 1]);
+          const comfort = evaluateComfort(currentTemp);
+          el.comfortValue.textContent = comfort.label;
+          el.comfortSub.textContent = comfort.sub;
+        }
+
+        if (outsideCurrent && outsideCurrent.currentTemp != null) {
+          el.outsideTemp.textContent = Number(outsideCurrent.currentTemp).toFixed(2) + ' °C';
+          el.outsideInfo.textContent = 'Aktualizacja: ' + (outsideCurrent.currentTime ? formatDateTime(outsideCurrent.currentTime) : '—');
+          el.outsideRH.textContent = outsideCurrent.currentRH != null ? Number(outsideCurrent.currentRH).toFixed(1) + ' %' : '--.-- %';
+          el.outsideAH.textContent = outsideCurrent.currentAH != null ? Number(outsideCurrent.currentAH).toFixed(2) + ' g/m³' : '--.-- g/m³';
+          el.outsidePressure.textContent = outsideCurrent.currentPressure != null ? Number(outsideCurrent.currentPressure).toFixed(1) + ' hPa' : '--.-- hPa';
+          el.outsideDewPoint.textContent = outsideCurrent.currentDewPoint != null ? Number(outsideCurrent.currentDewPoint).toFixed(2) + ' °C' : '--.-- °C';
+        } else {
+          el.outsideTemp.textContent = '--.-- °C';
+          el.outsideInfo.textContent = 'Dane zewnętrzne: brak';
+          el.outsideRH.textContent = '--.-- %';
+          el.outsideAH.textContent = '--.-- g/m³';
+          el.outsidePressure.textContent = '--.-- hPa';
+          el.outsideDewPoint.textContent = '--.-- °C';
+        }
+
+        if (sunDaily && sunDaily.sunrise && sunDaily.sunset) {
+          el.sunriseValue.textContent = formatTimePL(sunDaily.sunrise);
+          el.sunsetValue.textContent = formatTimePL(sunDaily.sunset);
+        } else {
+          el.sunriseValue.textContent = '--:--';
+          el.sunsetValue.textContent = '--:--';
+        }
+
+        const sensorStats = calculateStats(sensorY);
+        const lublinStats = calculateStats(lublinY);
+        setStatsBlock('sensor', sensorStats, sensorY.length);
+        setStatsBlock('lublin', lublinStats, lublinY.length);
+        el.pointCountsSummary.textContent = 'S: ' + sensorY.length + ' | L: ' + lublinY.length;
+      }
+
+      function setStatsBlock(prefix, stats, pointCount) {
+        const map = prefix === 'sensor' ? {
+          min: el.sensorMin, max: el.sensorMax, avg: el.sensorAvg, amplitude: el.sensorAmplitude,
+          trend: el.sensorTrend, trendNote: el.sensorTrendNote, pointCount: el.sensorPointCount
+        } : {
+          min: el.lublinMin, max: el.lublinMax, avg: el.lublinAvg, amplitude: el.lublinAmplitude,
+          trend: el.lublinTrend, trendNote: el.lublinTrendNote, pointCount: el.lublinPointCount
+        };
+
+        if (!stats) {
+          map.min.textContent = '--';
+          map.max.textContent = '--';
+          map.avg.textContent = '--';
+          map.amplitude.textContent = '--';
+          map.trend.textContent = '--';
+          map.trend.className = 'analysis-value';
+          map.trendNote.textContent = 'Brak danych.';
+          map.pointCount.textContent = '--';
+          return;
+        }
+
+        const trendInfo = formatTrend(stats.trend);
+        map.min.textContent = stats.min.toFixed(2) + ' °C';
+        map.max.textContent = stats.max.toFixed(2) + ' °C';
+        map.avg.textContent = stats.avg.toFixed(2) + ' °C';
+        map.amplitude.textContent = 'Amplituda: ' + stats.amplitude.toFixed(3) + ' °C';
+        map.trend.textContent = trendInfo.text;
+        map.trend.className = 'analysis-value ' + trendInfo.cls;
+        map.trendNote.textContent = trendInfo.note;
+        map.pointCount.textContent = String(pointCount);
+      }
+
+      function getCommonPlotConfig() {
+        return { responsive: true, displayModeBar: true, scrollZoom: true, displaylogo: false };
+      }
+
+      function setDebugInfo(message) {
+        if (el.debugInfo) el.debugInfo.textContent = 'Diagnostyka: ' + message;
+      }
+
+      function getLegendVisible(chartId) {
+        return legendVisibleState.hasOwnProperty(chartId) ? legendVisibleState[chartId] : true;
+      }
+
+      function updateLegendButtonText(button, chartId) {
+        if (!button) return;
+        button.textContent = getLegendVisible(chartId) ? 'Ukryj legendę' : 'Pokaż legendę';
+      }
+
+      function safePlotlyReact(chartId, traces, layout, config, infoEl) {
+        const node = byId(chartId);
+        if (!node) {
+          const message = 'Brak kontenera wykresu: ' + chartId;
+          console.error(message);
+          if (infoEl) infoEl.textContent = message;
+          return Promise.resolve(false);
+        }
+        if (typeof Plotly === 'undefined' || !Plotly.react) {
+          const message = 'Biblioteka Plotly nie została załadowana. Sprawdź połączenie z CDN albo blokowanie skryptów.';
+          console.error(message);
+          if (infoEl) infoEl.textContent = message;
+          node.innerHTML = '<div class="info-line">' + message + '</div>';
+          return Promise.resolve(false);
+        }
+        return Promise.resolve(Plotly.react(chartId, traces, layout, config)).then(function () {
+          return true;
+        }).catch(function (error) {
+          const message = 'Błąd rysowania wykresu ' + chartId + ': ' + (error && error.message ? error.message : error);
+          console.error(message, error);
+          if (infoEl) infoEl.textContent = message;
+          node.innerHTML = '<div class="info-line">' + message + '</div>';
+          setDebugInfo(message + ' | Możliwy limit WebGL, problem sterownika GPU, blokada CDN albo błąd danych.');
+          return false;
+        });
+      }
+
+      function safePlotlyRelayout(chartId, update) {
+        if (typeof Plotly === 'undefined' || !Plotly.relayout) return Promise.resolve(false);
+        const node = byId(chartId);
+        if (!node || !node.data) return Promise.resolve(false);
+        return Promise.resolve(Plotly.relayout(chartId, update)).then(function () {
+          return true;
+        }).catch(function (error) {
+          console.error('Błąd relayout dla ' + chartId + ':', error);
+          setDebugInfo('Błąd zmiany widoku wykresu ' + chartId + ': ' + (error && error.message ? error.message : error));
+          return false;
+        });
+      }
+
+      function checkWebGlSupport() {
+        try {
+          const canvas = document.createElement('canvas');
+          return !!(window.WebGLRenderingContext && (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function validateRuntimeEnvironment() {
+        const plotlyOk = typeof Plotly !== 'undefined' && !!Plotly.react;
+        const webglOk = checkWebGlSupport();
+        const xlsxOk = typeof XLSX !== 'undefined';
+        setDebugInfo('Plotly: ' + (plotlyOk ? 'OK' : 'brak') + ' | WebGL: ' + (webglOk ? 'OK' : 'brak') + ' | XLSX: ' + (xlsxOk ? 'OK' : 'brak') + ' | User agent: ' + navigator.userAgent);
+        if (!plotlyOk) throw new Error('Nie załadowano biblioteki Plotly.');
+        if (!webglOk) console.warn('WebGL nie jest dostępny. Wykresy 3D mogą się nie wyświetlać.');
+      }
+
+      function resizeAllCharts() {
+        if (typeof Plotly === 'undefined' || !Plotly.Plots || !Plotly.Plots.resize) return;
+        ['mainChartSensorFocus', 'mainChart', 'histChart', 'meteoChart', 'overlayChart', 'mollierChart', 'mollier3dChart', 'sensorOverlay3dChart', 'sensorMeteoOverlay3dChart', 'sensorOverlay3dFullChart', 'meteoOverlay3dChart'].forEach(function (chartId) {
+          const node = byId(chartId);
+          if (node && node.data) {
+            try { Plotly.Plots.resize(node); } catch (error) { console.warn('Nie udało się przeskalować wykresu ' + chartId, error); }
+          }
+        });
+      }
+
+      function getCurrentProjectionType(chartId, fallbackProjection) {
+        const gd = byId(chartId);
+        const fromLayout = gd && gd.layout && gd.layout.scene && gd.layout.scene.camera && gd.layout.scene.camera.projection && gd.layout.scene.camera.projection.type;
+        return fromLayout || fallbackProjection || 'perspective';
+      }
+
+      function getCameraFor3DView(chartId, fallbackProjection) {
+        const view = sceneViewState[chartId] || 'iso';
+        const projectionType = getCurrentProjectionType(chartId, fallbackProjection);
+        const projection = { type: projectionType };
+
+        if (view === 'xz') {
+          return {
+            projection: projection,
+            eye: { x: 0, y: 2.35, z: 0.001 },
+            center: { x: 0, y: 0, z: 0 },
+            up: { x: 0, y: 0, z: 1 }
+          };
+        }
+
+        if (view === 'yz') {
+          return {
+            projection: projection,
+            eye: { x: 2.35, y: 0, z: 0.001 },
+            center: { x: 0, y: 0, z: 0 },
+            up: { x: 0, y: 0, z: 1 }
+          };
+        }
+
+        if (chartId === 'mollier3dChart') {
+          return { projection: projection, eye: { x: 1.3, y: 1.45, z: 0.92 } };
+        }
+
+        return { projection: projection, eye: { x: 1.4, y: 1.35, z: 0.9 } };
+      }
+
+      function set3DPlaneView(chartId, view) {
+        if (!sceneViewState.hasOwnProperty(chartId)) return;
+        sceneViewState[chartId] = view;
+        const camera = getCameraFor3DView(chartId, undefined);
+        safePlotlyRelayout(chartId, { 'scene.camera': camera });
+      }
+
+      function buildRangeSliderConfig() {
+        return { visible: true, bgcolor: '#101827', bordercolor: '#243146', thickness: 0.11 };
+      }
+
+      function getChartCurrentXWindow(gd) {
+        const xRange = gd && gd.layout && gd.layout.xaxis ? gd.layout.xaxis.range : null;
+        if (!xRange || xRange.length !== 2) return null;
+        const startMs = new Date(xRange[0]).getTime();
+        const endMs = new Date(xRange[1]).getTime();
+        if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return null;
+        return [Math.min(startMs, endMs), Math.max(startMs, endMs)];
+      }
+
+      function collectVisibleChartYValues(gd) {
+        const xWindow = getChartCurrentXWindow(gd);
+        const out = [];
+        const traces = gd && gd.data ? gd.data : [];
+        traces.forEach(function (trace) {
+          const isVisible = trace.visible === undefined || trace.visible === true;
+          if (!isVisible) return;
+          const xs = trace.x || [];
+          const ys = trace.y || [];
+          const count = Math.min(xs.length, ys.length);
+          for (let i = 0; i < count; i++) {
+            const y = ys[i];
+            if (!Number.isFinite(y)) continue;
+            if (xWindow) {
+              const xMs = new Date(xs[i]).getTime();
+              if (!Number.isFinite(xMs)) continue;
+              if (xMs < xWindow[0] || xMs > xWindow[1]) continue;
+            }
+            out.push(y);
+          }
+        });
+        return out;
+      }
+
+      function rescaleChartYAxisToVisibleTraces(chartId) {
+        const gd = byId(chartId);
+        const yValues = collectVisibleChartYValues(gd);
+        const yRange = computePaddedYRange(yValues);
+        if (!yRange) return;
+        safePlotlyRelayout(chartId, { 'yaxis.autorange': false, 'yaxis.range': yRange });
+      }
+
+      function bindAutoscaleHandlers(chartId) {
+        const gd = byId(chartId);
+        if (!gd || gd.__autoscaleBound) return;
+        gd.__autoscaleBound = true;
+        gd.on('plotly_restyle', function () {
+          setTimeout(function () { rescaleChartYAxisToVisibleTraces(chartId); }, 0);
+        });
+      }
+
+      function createMainChartLayout(sensorX, sensorY, lublinY, modelY) {
+        const mergedValues = sensorY.concat(lublinY).concat(modelY).filter(function (v) { return Number.isFinite(v); });
+        const yRange = mergedValues.length ? computePaddedYRange(mergedValues) : undefined;
+        const sensorXRange = sensorX.length ? [sensorX[0], sensorX[sensorX.length - 1]] : undefined;
+        return {
+          margin: { l: 56, r: 18, t: 12, b: 70 },
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+          font: { color: '#e5edf8' },
+          dragmode: 'pan',
+          uirevision: chartUiRevision,
+          legend: { orientation: 'h', y: 1.12, x: 0 },
+          xaxis: { title: 'Czas', gridcolor: '#243146', zerolinecolor: '#243146', fixedrange: false, autorange: false, range: sensorXRange, rangeslider: buildRangeSliderConfig() },
+          yaxis: { title: '°C', gridcolor: '#243146', zerolinecolor: '#243146', autorange: false, range: yRange, fixedrange: false },
+          showlegend: true
+        };
+      }
+
+      function buildMainChartTraces(sensorData, lublinHistory, lublinModel, hiddenDefaults) {
+        const traces = [{
+          x: sensorData.x, y: sensorData.y, mode: 'lines', name: 'Sensor',
+          line: { color: '#4f8cff', width: 2.6 }, fill: 'tozeroy', fillcolor: 'rgba(79, 140, 255, 0.08)'
+        }];
+        if (lublinHistory.x.length && lublinHistory.temp.length) {
+          traces.push({ x: lublinHistory.x, y: lublinHistory.temp, mode: 'lines', name: 'Lublin', visible: hiddenDefaults ? 'legendonly' : true, line: { color: '#f59e0b', width: 2.1 } });
+        }
+        if (lublinModel.x.length && lublinModel.temp.length) {
+          traces.push({ x: lublinModel.x, y: lublinModel.temp, mode: 'lines', name: 'Lublin model', visible: hiddenDefaults ? 'legendonly' : true, line: { color: '#f472b6', width: 2.0, dash: 'dash' } });
+        }
+        return traces;
+      }
+
+      function renderMainChart(chartId, sensorData, lublinHistory, lublinModel, hiddenDefaults) {
+        const traces = buildMainChartTraces(sensorData, lublinHistory, lublinModel, !!hiddenDefaults);
+        const layout = createMainChartLayout(sensorData.x, sensorData.y, lublinHistory.temp, lublinModel.temp);
+        safePlotlyReact(chartId, traces, layout, getCommonPlotConfig());
+        bindAutoscaleHandlers(chartId);
+        setTimeout(function () { rescaleChartYAxisToVisibleTraces(chartId); }, 0);
+      }
+
+      function renderHistogram(sensorY) {
+        const trace = { x: sensorY, type: 'histogram', marker: { color: '#22c55e', line: { color: '#1a2c1f', width: 1 } }, opacity: 0.9, nbinsx: Math.min(24, Math.max(8, Math.round(Math.sqrt(sensorY.length || 1)))) };
+        const layout = {
+          margin: { l: 56, r: 18, t: 12, b: 70 },
+          paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#e5edf8' },
+          bargap: 0.06, dragmode: 'pan', uirevision: chartUiRevision,
+          xaxis: { title: 'Temperatura [°C]', gridcolor: '#243146', fixedrange: false, rangeslider: buildRangeSliderConfig() },
+          yaxis: { title: 'Liczba wystąpień', gridcolor: '#243146', fixedrange: false }
+        };
+        safePlotlyReact('histChart', [trace], layout, getCommonPlotConfig());
+      }
+
+      function renderMeteoChart(lublinHistory) {
+        const traces = [];
+        if (lublinHistory.x.length) {
+          traces.push({ x: lublinHistory.x, y: lublinHistory.rh, mode: 'lines', name: 'RH [%]', line: { color: '#38bdf8', width: 2.0 } });
+          traces.push({ x: lublinHistory.x, y: lublinHistory.ah, mode: 'lines', name: 'AH [g/m³]', line: { color: '#22c55e', width: 2.0, dash: 'dot' } });
+          traces.push({ x: lublinHistory.x, y: lublinHistory.dewPoint, mode: 'lines', name: 'Punkt rosy [°C]', line: { color: '#f472b6', width: 2.0 } });
+          traces.push({ x: lublinHistory.x, y: lublinHistory.pressure, mode: 'lines', name: 'Ciśnienie [hPa]', yaxis: 'y2', line: { color: '#f59e0b', width: 2.0 } });
+        }
+        const layout = {
+          margin: { l: 56, r: 56, t: 12, b: 70 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#e5edf8' },
+          dragmode: 'pan', uirevision: chartUiRevision, legend: { orientation: 'h', y: 1.12, x: 0 },
+          xaxis: { title: 'Czas', gridcolor: '#243146', fixedrange: false, rangeslider: buildRangeSliderConfig() },
+          yaxis: { title: 'RH / AH / DP', gridcolor: '#243146', fixedrange: false },
+          yaxis2: { title: 'hPa', overlaying: 'y', side: 'right', fixedrange: false }, showlegend: true
+        };
+        safePlotlyReact('meteoChart', traces, layout, getCommonPlotConfig());
+      }
+
+      function renderOverlayDaysChart(sensorData, lublinHistory) {
+        const daysToShow = overlayCompareDays;
+        const traces = [];
+        const palette = ['#4f8cff', '#22c55e', '#f59e0b', '#f472b6', '#38bdf8', '#a78bfa', '#ef4444'];
+
+        function buildDayOverlay(seriesX, seriesY, prefix, dashed) {
+          const map = new Map();
+          for (let i = 0; i < seriesX.length; i++) {
+            const d = seriesX[i];
+            const dayKey = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            if (!map.has(dayKey)) map.set(dayKey, []);
+            map.get(dayKey).push({ hour: d.getHours() + d.getMinutes() / 60, value: seriesY[i] });
+          }
+          const keys = Array.from(map.keys()).sort().slice(-daysToShow);
+          keys.forEach(function (key, idx) {
+            const arr = map.get(key).slice().sort(function (a, b) { return a.hour - b.hour; });
+            traces.push({ x: arr.map(function (p) { return p.hour; }), y: arr.map(function (p) { return p.value; }), mode: 'lines', name: prefix + ' ' + key, line: { color: palette[idx % palette.length], width: prefix === 'Sensor' ? 2.4 : 1.8, dash: dashed ? 'dash' : 'solid' } });
+          });
+        }
+
+        buildDayOverlay(sensorData.x, sensorData.y, 'Sensor', false);
+        buildDayOverlay(lublinHistory.x, lublinHistory.temp, 'Lublin', true);
+
+        const merged = sensorData.y.concat(lublinHistory.temp).filter(function (v) { return Number.isFinite(v); });
+        const yRange = merged.length ? computePaddedYRange(merged) : undefined;
+        const xTicks = Array.from({ length: 25 }, function (_, i) { return i; });
+        const layout = {
+          margin: { l: 56, r: 18, t: 12, b: 70 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#e5edf8' },
+          dragmode: 'pan', uirevision: chartUiRevision, legend: { orientation: 'h', y: 1.14, x: 0 },
+          xaxis: { title: 'Godzina doby', gridcolor: '#243146', tickmode: 'array', tickvals: xTicks, ticktext: xTicks.map(String), fixedrange: false, rangeslider: buildRangeSliderConfig() },
+          yaxis: { title: '°C', gridcolor: '#243146', range: yRange, fixedrange: false }, showlegend: true
+        };
+        safePlotlyReact('overlayChart', traces, layout, getCommonPlotConfig());
+      }
+
+      function renderMollierChart(outsideCurrent) {
+        const temp = outsideCurrent ? outsideCurrent.currentTemp : null;
+        const rh = outsideCurrent ? outsideCurrent.currentRH : null;
+        const pressure = outsideCurrent && Number.isFinite(outsideCurrent.currentPressure) ? outsideCurrent.currentPressure : 1013.25;
+        const rhLines = [20, 40, 60, 80, 100];
+        const traces = [];
+
+        rhLines.forEach(function (rhLine) {
+          const x = []; const y = [];
+          for (let t = -10; t <= 40; t += 1) {
+            const w = calculateHumidityRatio(t, rhLine, pressure);
+            const h = calculateEnthalpy(t, w);
+            if (Number.isFinite(h) && Number.isFinite(w)) { x.push(t); y.push(h); }
+          }
+          traces.push({ x: x, y: y, mode: 'lines', name: 'RH ' + rhLine + '%', line: { color: rhLine === 100 ? '#f59e0b' : '#243146', width: rhLine === 100 ? 2 : 1, dash: rhLine === 100 ? 'solid' : 'dot' }, hoverinfo: 'skip' });
+        });
+
+        if (Number.isFinite(temp) && Number.isFinite(rh)) {
+          const w = calculateHumidityRatio(temp, rh, pressure);
+          const h = calculateEnthalpy(temp, w);
+          traces.push({ x: [temp], y: [h], mode: 'markers+text', name: 'Aktualny punkt', marker: { size: 11, color: '#f472b6' }, text: ['Lublin teraz'], textposition: 'top center' });
+        }
+
+        const layout = {
+          margin: { l: 56, r: 18, t: 12, b: 70 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#e5edf8' },
+          dragmode: 'pan', uirevision: chartUiRevision, legend: { orientation: 'h', y: 1.14, x: 0 },
+          xaxis: { title: 'Temperatura sucha [°C]', gridcolor: '#243146', fixedrange: false, rangeslider: buildRangeSliderConfig() },
+          yaxis: { title: 'Entalpia [kJ/kg suchego powietrza]', gridcolor: '#243146', fixedrange: false }, showlegend: true
+        };
+        safePlotlyReact('mollierChart', traces, layout, getCommonPlotConfig());
+      }
+
+      function buildRhSurfaceTrace(rhValue, timeValues, pressureRef) {
+        const tempAxis = [];
+        for (let t = DEFAULT_TEMP_AXIS_MIN; t <= DEFAULT_TEMP_AXIS_MAX; t += 1) tempAxis.push(t);
+        const xMatrix = []; const yMatrix = []; const zMatrix = [];
+        for (let i = 0; i < timeValues.length; i++) {
+          const rowX = []; const rowY = []; const rowZ = [];
+          for (let j = 0; j < tempAxis.length; j++) {
+            const temp = tempAxis[j];
+            const w = calculateHumidityRatio(temp, rhValue, pressureRef);
+            const h = calculateEnthalpy(temp, w);
+            rowX.push(temp); rowY.push(timeValues[i]); rowZ.push(Number.isFinite(h) ? h : null);
+          }
+          xMatrix.push(rowX); yMatrix.push(rowY); zMatrix.push(rowZ);
+        }
+        return {
+          type: 'surface', name: 'RH ' + rhValue + '%', x: xMatrix, y: yMatrix, z: zMatrix, customdata: xMatrix,
+          opacity: rhValue === 100 ? 0.36 : 0.16, showscale: false,
+          hovertemplate: 'Temperatura: %{customdata:.2f} °C<br>Czas: %{y}<br>Entalpia: %{z:.2f} kJ/kg<extra>RH ' + rhValue + '%</extra>',
+          contours: { x: { show: false }, y: { show: false }, z: { show: false } },
+          colorscale: rhValue === 100 ? [[0, '#f59e0b'], [1, '#f59e0b']] : [[0, '#2f3f5f'], [1, '#2f3f5f']]
+        };
+      }
+
+      function renderMollier3D(historyPoints, currentPoint) {
+        if (!historyPoints.length) {
+          safePlotlyReact('mollier3dChart', [], {}, getCommonPlotConfig(), el.mollier3dInfo);
+          el.mollier3dInfo.textContent = 'Brak danych do wykresu Moliera 3D.';
+          return;
+        }
+
+        const traces = [];
+        const timeValues = historyPoints.map(function (p) { return p.time; });
+        const pressureValues = historyPoints.map(function (p) { return p.pressure; }).filter(function (v) { return Number.isFinite(v); });
+        const pressureRef = pressureValues.length ? pressureValues.reduce(function (a, b) { return a + b; }, 0) / pressureValues.length : 1013.25;
+
+        const xAxisVisualScale = 1.45;
+        const zAxisVisualScale = 1.1;
+        const historyTemps = historyPoints.map(function (p) { return p.temp; }).filter(function (v) { return Number.isFinite(v); });
+        const historyEnthalpies = historyPoints.map(function (p) { return p.enthalpy; }).filter(function (v) { return Number.isFinite(v); });
+        const tempDataMin = historyTemps.length ? Math.min.apply(null, historyTemps) : DEFAULT_TEMP_AXIS_MIN;
+        const tempDataMax = historyTemps.length ? Math.max.apply(null, historyTemps) : DEFAULT_TEMP_AXIS_MAX;
+        const tempDataSpan = Math.max(tempDataMax - tempDataMin, 1);
+        const tempSpanTarget = tempDataSpan / AXIS_DATA_COVERAGE_TARGET;
+        let tempCenter = (tempDataMin + tempDataMax) / 2;
+        if (currentPoint && Number.isFinite(currentPoint.temp)) tempCenter = (tempCenter + currentPoint.temp) / 2;
+        let tempMin = tempCenter - tempSpanTarget / 2;
+        let tempMax = tempCenter + tempSpanTarget / 2;
+
+        const enthalpySpanTarget = (tempSpanTarget * zAxisVisualScale) / (xAxisVisualScale * AXIS_DATA_COVERAGE_TARGET);
+        let enthalpyCenter = historyEnthalpies.length ? (Math.min.apply(null, historyEnthalpies) + Math.max.apply(null, historyEnthalpies)) / 2 : enthalpySpanTarget / 2;
+        if (currentPoint && Number.isFinite(currentPoint.enthalpy)) enthalpyCenter = (enthalpyCenter + currentPoint.enthalpy) / 2;
+        let enthalpyMin = enthalpyCenter - enthalpySpanTarget / 2;
+        let enthalpyMax = enthalpyCenter + enthalpySpanTarget / 2;
+        if (enthalpyMin < 0) { enthalpyMax += -enthalpyMin; enthalpyMin = 0; }
+
+        RH_SURFACES.forEach(function (rhValue) { traces.push(buildRhSurfaceTrace(rhValue, timeValues, pressureRef)); });
+        traces.push({ type: 'scatter3d', mode: 'lines+markers', name: 'Przebieg godzinowy', x: historyPoints.map(function (p) { return p.temp; }), y: historyPoints.map(function (p) { return p.time; }), z: historyPoints.map(function (p) { return p.enthalpy; }), customdata: historyPoints.map(function (p) { return p.temp; }), marker: { size: 3.5, color: historyPoints.map(function (p) { return p.rh; }), colorscale: 'Viridis', colorbar: { title: 'RH [%]' } }, line: { width: 6, color: '#4f8cff' }, hovertemplate: 'Temperatura: %{customdata:.2f} °C<br>Czas: %{y}<br>Entalpia: %{z:.2f} kJ/kg<extra>Historia</extra>' });
+        if (currentPoint) {
+          traces.push({ type: 'scatter3d', mode: 'markers+text', name: 'Aktualny punkt', x: [currentPoint.temp], y: [currentPoint.time], z: [currentPoint.enthalpy], customdata: [currentPoint.temp], marker: { size: 9, color: '#f472b6', symbol: 'diamond' }, text: ['Teraz'], textposition: 'top center', hovertemplate: 'Temperatura: %{customdata:.2f} °C<br>Czas: %{y}<br>Entalpia: %{z:.2f} kJ/kg<extra>Aktualny punkt</extra>' });
+        }
+
+        const layout = {
+          margin: { l: 0, r: 0, t: 6, b: 0 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#e5edf8' }, legend: { orientation: 'h', y: 1.02, x: 0 },
+          showlegend: getLegendVisible('mollier3dChart'),
+          scene: {
+            bgcolor: 'rgba(0,0,0,0)', aspectmode: 'manual', aspectratio: { x: 1.45, y: 1.7, z: 1.1 }, camera: getCameraFor3DView('mollier3dChart', 'perspective'),
+            xaxis: { title: 'Temperatura sucha [°C]', gridcolor: '#243146', zerolinecolor: '#243146', backgroundcolor: 'rgba(0,0,0,0)', range: [tempMax, tempMin] },
+            yaxis: { title: 'Czas', gridcolor: '#243146', zerolinecolor: '#243146', backgroundcolor: 'rgba(0,0,0,0)', type: 'date' },
+            zaxis: { title: 'Entalpia [kJ/kg suchego powietrza]', gridcolor: '#243146', zerolinecolor: '#243146', backgroundcolor: 'rgba(0,0,0,0)', range: [enthalpyMin, enthalpyMax] }
+          }
+        };
+        safePlotlyReact('mollier3dChart', traces, layout, getCommonPlotConfig(), el.mollier3dInfo);
+        el.mollier3dInfo.textContent = 'Zakres 3D: ' + historyPoints.length + ' punktów | Średnie ciśnienie odniesienia: ' + pressureRef.toFixed(1) + ' hPa | Aktualizacja: ' + (currentPoint && currentPoint.time ? formatDateTime(currentPoint.time) : '—');
+      }
+
+      function smoothNumericSeries(values, windowRadius) {
+        if (!Array.isArray(values) || values.length === 0 || windowRadius <= 0) return values;
+        const result = [];
+        for (let i = 0; i < values.length; i++) {
+          let sum = 0; let count = 0;
+          for (let j = i - windowRadius; j <= i + windowRadius; j++) {
+            if (j >= 0 && j < values.length && Number.isFinite(values[j])) { sum += values[j]; count += 1; }
+          }
+          result.push(count > 0 ? sum / count : values[i]);
+        }
+        return result;
+      }
+
+      function prepareOverlay3DData(seriesData, seriesLabel) {
+        const grouped = new Map();
+        const xs = seriesData && Array.isArray(seriesData.x) ? seriesData.x : [];
+        const ys = seriesData && Array.isArray(seriesData.y) ? seriesData.y : [];
+        let pointCount = 0;
+        for (let i = 0; i < Math.min(xs.length, ys.length); i++) {
+          const d = xs[i];
+          const value = Number(ys[i]);
+          if (!isValidDate(d) || !Number.isFinite(value)) continue;
+          const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+          if (!grouped.has(key)) grouped.set(key, []);
+          grouped.get(key).push({ hour: d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600, value: value, date: d });
+          pointCount += 1;
+        }
+        return { grouped: grouped, dayKeys: Array.from(grouped.keys()).sort(), pointCount: pointCount, seriesLabel: seriesLabel || 'Sensor' };
+      }
+
+      function prepareCombinedOverlay3DData(sensorData, meteoData) {
+        const sensorPrepared = prepareOverlay3DData(sensorData, 'Sensor');
+        const meteoPrepared = prepareOverlay3DData({ x: meteoData.x || [], y: meteoData.temp || [] }, 'Meteo');
+        const allDayKeysMap = new Map();
+        sensorPrepared.dayKeys.forEach(function (key) { allDayKeysMap.set(key, true); });
+        meteoPrepared.dayKeys.forEach(function (key) { allDayKeysMap.set(key, true); });
+
+        return {
+          kind: 'combined',
+          seriesLabel: 'Sensor + meteo',
+          sensor: sensorPrepared,
+          meteo: meteoPrepared,
+          dayKeys: Array.from(allDayKeysMap.keys()).sort(),
+          pointCount: sensorPrepared.pointCount + meteoPrepared.pointCount,
+          sensorPointCount: sensorPrepared.pointCount,
+          meteoPointCount: meteoPrepared.pointCount
+        };
+      }
+
+      function buildOverlay3DTraces(prepared, selectedDays, options) {
+        const cfg = options || {};
+        const traces = [];
+        const palette = ['#4f8cff', '#22c55e', '#f59e0b', '#f472b6', '#38bdf8', '#a78bfa', '#ef4444', '#10b981', '#fb7185', '#eab308'];
+        const xTickvals = [];
+        const xTicktext = [];
+        const allTemps = [];
+        const dayKeys = prepared.dayKeys.slice(-selectedDays);
+
+        dayKeys.forEach(function (key, idx) {
+          const points = prepared.grouped.get(key).slice().sort(function (a, b) { return a.hour - b.hour; });
+          xTickvals.push(idx);
+          xTicktext.push(key);
+          const rawTemps = points.map(function (p) { return p.value; }).filter(function (v) { return Number.isFinite(v); });
+          Array.prototype.push.apply(allTemps, rawTemps);
+          const zTemps = cfg.useSmoothing ? smoothNumericSeries(points.map(function (p) { return p.value; }), 1) : points.map(function (p) { return p.value; });
+          const trace = {
+            type: 'scatter3d', mode: cfg.showMarkers ? 'lines+markers' : 'lines', name: key,
+            x: points.map(function () { return idx; }),
+            y: points.map(function (p) { return p.hour; }),
+            z: zTemps,
+            customdata: points.map(function (p, i) { return [key, p.date.toLocaleTimeString('pl-PL'), p.value, zTemps[i]]; }),
+            line: { width: cfg.useSmoothing ? 4.5 : 5, color: palette[idx % palette.length] },
+            hovertemplate: prepared.seriesLabel + ': %{customdata[2]:.2f} °C<br>Dzień: %{customdata[0]}<br>Godzina: %{customdata[1]}<br>Wartość na linii: %{customdata[3]:.2f} °C<extra>' + prepared.seriesLabel + '</extra>'
+          };
+          if (cfg.showMarkers) trace.marker = { size: 3.2, color: palette[idx % palette.length] };
+          traces.push(trace);
+        });
+
+        return { traces: traces, xTickvals: xTickvals, xTicktext: xTicktext, zRange: computePaddedYRange(allTemps) || [0, 1], dayKeys: dayKeys, pointCount: prepared.pointCount };
+      }
+
+      function buildCombinedOverlay3DTraces(prepared, selectedDays, options) {
+        const cfg = options || {};
+        const traces = [];
+        const dayKeys = prepared.dayKeys.slice(-selectedDays);
+        const xTickvals = [];
+        const xTicktext = [];
+        const allTemps = [];
+        const dayPalette = ['#4f8cff', '#22c55e', '#f59e0b', '#f472b6', '#38bdf8', '#a78bfa', '#ef4444', '#10b981', '#fb7185', '#eab308'];
+
+        function addTraceForSeries(dayKey, dayIndex, seriesPrepared, seriesName) {
+          if (!seriesPrepared.grouped.has(dayKey)) return;
+          const points = seriesPrepared.grouped.get(dayKey).slice().sort(function (a, b) { return a.hour - b.hour; });
+          const rawTemps = points.map(function (p) { return p.value; }).filter(function (v) { return Number.isFinite(v); });
+          Array.prototype.push.apply(allTemps, rawTemps);
+          const zTemps = cfg.useSmoothing ? smoothNumericSeries(points.map(function (p) { return p.value; }), 1) : points.map(function (p) { return p.value; });
+
+          const sensorColor = dayPalette[dayIndex % dayPalette.length];
+          const meteoColor = '#f59e0b';
+          const baseColor = seriesName === 'Sensor' ? sensorColor : meteoColor;
+          const lineWidth = seriesName === 'Sensor' ? 5 : 4.2;
+          const opacity = seriesName === 'Sensor' ? 1.0 : 0.78;
+
+          traces.push({
+            type: 'scatter3d',
+            mode: cfg.showMarkers ? 'lines+markers' : 'lines',
+            name: seriesName + ' ' + dayKey,
+            x: points.map(function () { return dayIndex; }),
+            y: points.map(function (p) { return p.hour; }),
+            z: zTemps,
+            customdata: points.map(function (p, i) { return [seriesName, dayKey, p.date.toLocaleTimeString('pl-PL'), p.value, zTemps[i]]; }),
+            line: { width: lineWidth, color: baseColor },
+            opacity: opacity,
+            marker: cfg.showMarkers ? { size: 3, color: baseColor } : { size: 0.01, color: baseColor },
+            hovertemplate: '%{customdata[0]}: %{customdata[3]:.2f} °C<br>Dzień: %{customdata[1]}<br>Godzina: %{customdata[2]}<br>Wartość na linii: %{customdata[4]:.2f} °C<extra>%{customdata[0]}</extra>'
+          });
+        }
+
+        dayKeys.forEach(function (key, idx) {
+          xTickvals.push(idx);
+          xTicktext.push(key);
+          addTraceForSeries(key, idx, prepared.sensor, 'Sensor');
+          addTraceForSeries(key, idx, prepared.meteo, 'Meteo');
+        });
+
+        return { traces: traces, xTickvals: xTickvals, xTicktext: xTicktext, zRange: computePaddedYRange(allTemps) || [0, 1], dayKeys: dayKeys, pointCount: prepared.pointCount };
+      }
+
+      function renderCombinedOverlay3DPrepared(chartId, infoEl, prepared, selectedDays, options) {
+        const renderStart = performance.now();
+        if (!prepared || !prepared.dayKeys.length) {
+          return safePlotlyReact(chartId, [], {}, getCommonPlotConfig(), infoEl).then(function () {
+            infoEl.textContent = 'Brak danych do połączonego overlay 3D.';
+            return 0;
+          });
+        }
+        const cfg = options || {};
+        const build = buildCombinedOverlay3DTraces(prepared, selectedDays, cfg);
+        const hourTickVals = Array.from({ length: 25 }, function (_, i) { return i; });
+        const zTick0 = Math.floor(build.zRange[0]);
+
+        const layout = {
+          margin: { l: 0, r: 0, t: 6, b: 0 },
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+          font: { color: '#e5edf8' },
+          legend: { orientation: 'h', y: 1.02, x: 0 },
+          scene: {
+            bgcolor: 'rgba(0,0,0,0)',
+            aspectmode: 'manual',
+            aspectratio: { x: 1.25, y: 1.45, z: 1.1 },
+            camera: getCameraFor3DView(chartId, cfg.projectionMode || 'perspective'),
+            xaxis: { title: 'Dzień', gridcolor: '#243146', zerolinecolor: '#243146', backgroundcolor: 'rgba(0,0,0,0)', tickmode: 'array', tickvals: build.xTickvals, ticktext: build.xTicktext, range: [-0.5, Math.max(build.dayKeys.length - 0.5, 0.5)] },
+            yaxis: { title: 'Godzina doby', gridcolor: '#243146', zerolinecolor: '#243146', backgroundcolor: 'rgba(0,0,0,0)', tickmode: 'array', tickvals: hourTickVals, ticktext: hourTickVals.map(String), range: [0, 24] },
+            zaxis: { title: 'Temperatura [°C]', gridcolor: '#243146', zerolinecolor: '#243146', backgroundcolor: 'rgba(0,0,0,0)', range: build.zRange, tick0: zTick0, dtick: 1 }
+          },
+          showlegend: getLegendVisible(chartId)
+        };
+
+        return safePlotlyReact(chartId, build.traces, layout, getCommonPlotConfig(), infoEl).then(function () {
+          const renderMs = performance.now() - renderStart;
+          infoEl.textContent = 'Sensor + meteo overlay 3D | dni na wykresie: ' + build.dayKeys.length + ' | punkty: sensor ' + prepared.sensorPointCount + ' / meteo ' + prepared.meteoPointCount + ' | projekcja: ' + (cfg.projectionMode || 'perspective') + (cfg.useSmoothing ? ' | wygładzenie: tak' : ' | wygładzenie: nie') + ' | odświeżenie: ' + formatDurationMs(renderMs);
+          return renderMs;
+        });
+      }
+
+      function renderOverlay3DPrepared(chartId, infoEl, prepared, selectedDays, options) {
+        const renderStart = performance.now();
+        if (!prepared || !prepared.dayKeys.length) {
+          return safePlotlyReact(chartId, [], {}, getCommonPlotConfig(), infoEl).then(function () {
+            infoEl.textContent = 'Brak danych do overlay 3D.';
+            return 0;
+          });
+        }
+        const cfg = options || {};
+        const build = buildOverlay3DTraces(prepared, selectedDays, cfg);
+        const hourTickVals = Array.from({ length: 25 }, function (_, i) { return i; });
+        const zTick0 = Math.floor(build.zRange[0]);
+
+        const layout = {
+          margin: { l: 0, r: 0, t: 6, b: 0 }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#e5edf8' }, legend: { orientation: 'h', y: 1.02, x: 0 },
+          scene: {
+            bgcolor: 'rgba(0,0,0,0)', aspectmode: 'manual', aspectratio: { x: 1.25, y: 1.45, z: 1.1 },
+            camera: getCameraFor3DView(chartId, cfg.projectionMode || 'perspective'),
+            xaxis: { title: 'Dzień', gridcolor: '#243146', zerolinecolor: '#243146', backgroundcolor: 'rgba(0,0,0,0)', tickmode: 'array', tickvals: build.xTickvals, ticktext: build.xTicktext, range: [-0.5, Math.max(build.dayKeys.length - 0.5, 0.5)] },
+            yaxis: { title: 'Godzina doby', gridcolor: '#243146', zerolinecolor: '#243146', backgroundcolor: 'rgba(0,0,0,0)', tickmode: 'array', tickvals: hourTickVals, ticktext: hourTickVals.map(String), range: [0, 24] },
+            zaxis: { title: 'Temperatura [°C]', gridcolor: '#243146', zerolinecolor: '#243146', backgroundcolor: 'rgba(0,0,0,0)', range: build.zRange, tick0: zTick0, dtick: 1 }
+          }, showlegend: getLegendVisible(chartId)
+        };
+
+        return safePlotlyReact(chartId, build.traces, layout, getCommonPlotConfig(), infoEl).then(function () {
+          const renderMs = performance.now() - renderStart;
+          infoEl.textContent = prepared.seriesLabel + ' overlay 3D | dni na wykresie: ' + build.dayKeys.length + ' | punktów: ' + build.pointCount + ' | projekcja: ' + (cfg.projectionMode || 'perspective') + (cfg.useSmoothing ? ' | wygładzenie: tak' : ' | wygładzenie: nie') + ' | odświeżenie: ' + formatDurationMs(renderMs);
+          return renderMs;
+        });
+      }
+
+      function rerenderCurrentSensorOverlay3D() {
+        return renderOverlay3DPrepared('sensorOverlay3dChart', el.sensorOverlay3dInfo, currentSensorPrepared3D, sensor3dOverlayDays, { useSmoothing: false, projectionMode: sensor3dProjectionMode, showMarkers: false });
+      }
+
+      function rerenderFullSensorOverlay3D() {
+        return renderOverlay3DPrepared('sensorOverlay3dFullChart', el.sensorOverlay3dFullInfo, fullSensorPrepared3D, sensor3dFullOverlayDays, { useSmoothing: true, projectionMode: sensor3dFullProjectionMode, showMarkers: false });
+      }
+
+      function rerenderCurrentSensorMeteoOverlay3D() {
+        return renderCombinedOverlay3DPrepared('sensorMeteoOverlay3dChart', el.sensorMeteoOverlay3dInfo, currentSensorMeteoPrepared3D, sensorMeteo3dOverlayDays, { useSmoothing: false, projectionMode: sensorMeteo3dProjectionMode, showMarkers: false });
+      }
+
+      function rerenderCurrentMeteoOverlay3D() {
+        return renderOverlay3DPrepared('meteoOverlay3dChart', el.meteoOverlay3dInfo, currentMeteoPrepared3D, meteo3dOverlayDays, { useSmoothing: false, projectionMode: meteo3dProjectionMode, showMarkers: false });
+      }
+
+      function updateSensorOverlayAvailabilityFromData(sensorData) {
+        const uniqueDays = new Set(sensorData.x.map(function (d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }));
+        sensorAvailableDaysMax = Math.max(1, uniqueDays.size);
+        if (sensor3dOverlayAutoMaxPending) {
+          sensor3dOverlayDays = sensorAvailableDaysMax;
+          sensor3dOverlayAutoMaxPending = false;
+        } else {
+          if (sensor3dOverlayDays > sensorAvailableDaysMax) sensor3dOverlayDays = sensorAvailableDaysMax;
+          if (sensor3dOverlayDays < 1) sensor3dOverlayDays = 1;
+        }
+        el.sensorOverlay3dDaysSlider.max = String(sensorAvailableDaysMax);
+        el.sensorOverlay3dDaysSlider.value = String(sensor3dOverlayDays);
+        el.sensorOverlay3dDaysValue.textContent = formatDaysText(sensor3dOverlayDays) + ' / max ' + sensorAvailableDaysMax;
+      }
+
+      function updateFullSensorOverlayAvailability(fullSensorData) {
+        const uniqueDays = new Set(fullSensorData.x.map(function (d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }));
+        sensorFullAvailableDaysMax = Math.max(1, uniqueDays.size);
+        if (sensor3dFullOverlayDays > sensorFullAvailableDaysMax) sensor3dFullOverlayDays = sensorFullAvailableDaysMax;
+        if (sensor3dFullOverlayDays < 1) sensor3dFullOverlayDays = 1;
+        el.sensorOverlay3dFullDaysSlider.max = String(sensorFullAvailableDaysMax);
+        el.sensorOverlay3dFullDaysSlider.value = String(sensor3dFullOverlayDays);
+        el.sensorOverlay3dFullDaysValue.textContent = formatDaysText(sensor3dFullOverlayDays) + ' / max ' + sensorFullAvailableDaysMax;
+      }
+
+      function updateSensorMeteoOverlayAvailabilityFromData(combinedPrepared) {
+        const count = combinedPrepared && combinedPrepared.dayKeys ? combinedPrepared.dayKeys.length : 0;
+        sensorMeteoAvailableDaysMax = Math.max(1, count);
+        if (sensorMeteo3dOverlayAutoMaxPending) {
+          sensorMeteo3dOverlayDays = sensorMeteoAvailableDaysMax;
+          sensorMeteo3dOverlayAutoMaxPending = false;
+        } else {
+          if (sensorMeteo3dOverlayDays > sensorMeteoAvailableDaysMax) sensorMeteo3dOverlayDays = sensorMeteoAvailableDaysMax;
+          if (sensorMeteo3dOverlayDays < 1) sensorMeteo3dOverlayDays = 1;
+        }
+        el.sensorMeteoOverlay3dDaysSlider.max = String(sensorMeteoAvailableDaysMax);
+        el.sensorMeteoOverlay3dDaysSlider.value = String(sensorMeteo3dOverlayDays);
+        el.sensorMeteoOverlay3dDaysValue.textContent = formatDaysText(sensorMeteo3dOverlayDays) + ' / max ' + sensorMeteoAvailableDaysMax;
+      }
+
+      function updateMeteoOverlayAvailabilityFromData(lublinHistory) {
+        const uniqueDays = new Set(lublinHistory.x.map(function (d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }));
+        meteoAvailableDaysMax = Math.max(1, uniqueDays.size);
+        if (meteo3dOverlayAutoMaxPending) {
+          meteo3dOverlayDays = meteoAvailableDaysMax;
+          meteo3dOverlayAutoMaxPending = false;
+        } else {
+          if (meteo3dOverlayDays > meteoAvailableDaysMax) meteo3dOverlayDays = meteoAvailableDaysMax;
+          if (meteo3dOverlayDays < 1) meteo3dOverlayDays = 1;
+        }
+        el.meteoOverlay3dDaysSlider.max = String(meteoAvailableDaysMax);
+        el.meteoOverlay3dDaysSlider.value = String(meteo3dOverlayDays);
+        el.meteoOverlay3dDaysValue.textContent = formatDaysText(meteo3dOverlayDays) + ' / max ' + meteoAvailableDaysMax;
+      }
+
+      function updateOverlayCompareAvailability(sensorData, lublinHistory) {
+        const sensorDays = new Set(sensorData.x.map(function (d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })).size;
+        const lublinDays = new Set(lublinHistory.x.map(function (d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })).size;
+        overlayCompareDaysMax = Math.max(1, Math.max(sensorDays, lublinDays));
+        if (overlayCompareDays > overlayCompareDaysMax) overlayCompareDays = overlayCompareDaysMax;
+        if (overlayCompareDays < 1) overlayCompareDays = 1;
+        el.overlayDaysSlider.max = String(overlayCompareDaysMax);
+        el.overlayDaysSlider.value = String(overlayCompareDays);
+        el.overlayDaysValue.textContent = formatDaysText(overlayCompareDays) + ' / max ' + overlayCompareDaysMax;
+      }
+
+      function buildExportRows(datasetKey) {
+        if (datasetKey === 'current_sensor') {
+          return lastCurrentSensorData.x.map(function (d, i) { return { czas: d.toISOString(), temperatura_sensor_C: lastCurrentSensorData.y[i] }; });
+        }
+        if (datasetKey === 'full_sensor') {
+          const data = fullSensorCacheData || { x: [], y: [] };
+          return data.x.map(function (d, i) { return { czas: d.toISOString(), temperatura_sensor_C: data.y[i] }; });
+        }
+        if (datasetKey === 'current_combo') {
+          const rows = [];
+          lastCurrentSensorData.x.forEach(function (d, i) { rows.push({ typ: 'sensor', czas: d.toISOString(), temperatura_C: lastCurrentSensorData.y[i] }); });
+          lastCurrentLublinData.x.forEach(function (d, i) { rows.push({ typ: 'lublin', czas: d.toISOString(), temperatura_C: lastCurrentLublinData.temp[i] }); });
+          return rows;
+        }
+        return [];
+      }
+
+      function downloadBlob(blob, fileName) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function exportRowsToCsv(rows, fileName) {
+        if (!rows.length) throw new Error('Brak danych do eksportu.');
+        const headers = Object.keys(rows[0]);
+        const csv = [headers.join(';')].concat(rows.map(function (row) { return headers.map(function (h) { return JSON.stringify(row[h] == null ? '' : row[h]); }).join(';'); })).join('\n');
+        downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), fileName);
+      }
+
+      function exportRowsToXlsx(rows, fileName) {
+        if (!rows.length) throw new Error('Brak danych do eksportu.');
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Dane');
+        XLSX.writeFile(workbook, fileName);
+      }
+
+      async function handleExport() {
+        try {
+          const dataset = el.exportDatasetSelect.value;
+          const format = el.exportFormatSelect.value;
+          if (dataset === 'full_sensor' && !fullSensorCacheData) {
+            el.exportInfo.textContent = 'Pobieranie pełnego zbioru przed eksportem...';
+            fullSensorCacheData = await fetchFullSensorDataset(true);
+          }
+          const rows = buildExportRows(dataset);
+          const ts = new Date().toISOString().replace(/[:.]/g, '-');
+          if (format === 'csv') exportRowsToCsv(rows, 'eksport_' + dataset + '_' + ts + '.csv');
+          else exportRowsToXlsx(rows, 'eksport_' + dataset + '_' + ts + '.xlsx');
+          el.exportInfo.textContent = 'Eksport zakończony: ' + dataset + ' -> ' + format.toUpperCase();
+        } catch (error) {
+          console.error(error);
+          el.exportInfo.textContent = 'Błąd eksportu: ' + error.message;
+        }
+      }
+
+      async function renderDashboard() {
+        const fetchStart = performance.now();
+        let overlay3dRenderMs = NaN;
+        setProgress(0, 'Przygotowanie pobierania...');
+        setProgressTimes(NaN, NaN);
+        setProgressCounts(NaN, NaN);
+        el.status.textContent = 'Pobieranie...';
+
+        try {
+          const range = getActiveRange();
+          let sensorCountLive = NaN;
+          let meteoCountLive = NaN;
+
+          const sensorPromise = fetchThingSpeakRange(range.start, range.end, MAX_POINTS, function (done, total, phase, currentCount) {
+            if (Number.isFinite(currentCount)) {
+              sensorCountLive = currentCount;
+              setProgressCounts(sensorCountLive, meteoCountLive);
+            }
+            if (phase === 'fetch') setProgress(4 + (done / Math.max(total, 1)) * 38, 'Pobieranie sensora: ' + done + '/' + total + ' partii');
+            else if (phase === 'processing') setProgress(44, 'Scalanie i filtrowanie danych sensora...');
+            else if (phase === 'finalizing') setProgress(46, 'Redukcja liczby punktów sensora...');
+            else if (phase === 'done') setProgress(48, 'Dane sensora gotowe.');
+          });
+
+          const lublinCurrentPromise = fetchLublinCurrent();
+          const lublinHistoryPromise = fetchLublinHistory(range.start, range.end).then(function (data) {
+            meteoCountLive = data.temp.length;
+            setProgressCounts(sensorCountLive, meteoCountLive);
+            return data;
+          });
+          const lublinModelPromise = fetchLublinModelLine(range.start, range.end);
+          const sunDailyPromise = fetchLublinSunDaily();
+          const fullSensorPromise = fetchFullSensorDataset(false, function (done, total, fromCache, phase, count) {
+            if (fromCache) { setProgress(74, 'Pełny zbiór sensora z pamięci podręcznej'); return; }
+            if (phase === 'fetch') setProgress(50 + (done / Math.max(total, 1)) * 20, 'Pobieranie pełnego zbioru sensora: ' + done + '/' + total + ' partii');
+            else if (phase === 'processing') setProgress(72, 'Scalanie i filtrowanie pełnego zbioru sensora...');
+            else if (phase === 'finalizing') setProgress(76, 'Redukcja liczby punktów pełnego zbioru sensora...');
+            else if (phase === 'done') setProgress(78, 'Pełny zbiór sensora gotowy (' + (count || 0) + ' próbek).');
+          });
+
+          const results = await Promise.all([sensorPromise, lublinCurrentPromise, lublinHistoryPromise, lublinModelPromise, sunDailyPromise, fullSensorPromise]);
+          const sensorData = results[0];
+          const lublinCurrent = results[1];
+          const lublinHistory = results[2];
+          const lublinModel = results[3];
+          const sunDaily = results[4];
+          const fullSensorData = results[5];
+
+          const fetchMs = performance.now() - fetchStart;
+          setProgress(80, 'Dane pobrane. Przygotowanie wykresów...');
+          setProgressTimes(fetchMs, NaN);
+
+          lastCurrentSensorData = sensorData;
+          lastCurrentLublinData = lublinHistory;
+          fullSensorCacheData = fullSensorData;
+          fullSensorCacheTs = Date.now();
+
+          currentSensorPrepared3D = prepareOverlay3DData(sensorData, 'Sensor');
+          currentMeteoPrepared3D = prepareOverlay3DData({ x: lublinHistory.x, y: lublinHistory.temp }, 'Meteo');
+          currentSensorMeteoPrepared3D = prepareCombinedOverlay3DData(sensorData, lublinHistory);
+          fullSensorPrepared3D = prepareOverlay3DData(fullSensorData, 'Sensor pełny');
+
+          updateSensorOverlayAvailabilityFromData(sensorData);
+          updateFullSensorOverlayAvailability(fullSensorData);
+          updateSensorMeteoOverlayAvailabilityFromData(currentSensorMeteoPrepared3D);
+          updateMeteoOverlayAvailabilityFromData(lublinHistory);
+          updateOverlayCompareAvailability(sensorData, lublinHistory);
+          setProgressCounts(sensorData.y.length, lublinHistory.temp.length);
+          updateAnalysisPanel(sensorData, lublinHistory, lublinCurrent, sunDaily);
+
+          setProgress(84, 'Rysowanie wykresów głównych 2D...');
+          renderMainChart('mainChartSensorFocus', sensorData, lublinHistory, lublinModel, true);
+          renderMainChart('mainChart', sensorData, lublinHistory, lublinModel, false);
+
+          setProgress(88, 'Rysowanie wykresów pomocniczych 2D...');
+          renderHistogram(sensorData.y);
+          renderMeteoChart(lublinHistory);
+          renderOverlayDaysChart(sensorData, lublinHistory);
+          renderMollierChart(lublinCurrent);
+
+          const history3dPoints = lublinHistory.x.map(function (time, i) {
+            const temp = lublinHistory.temp[i];
+            const rh = lublinHistory.rh[i];
+            const pressure = lublinHistory.pressure[i];
+            const humidityRatio = calculateHumidityRatio(temp, rh, pressure);
+            const enthalpy = calculateEnthalpy(temp, humidityRatio);
+            return { time: time, temp: temp, rh: rh, pressure: pressure, humidityRatio: humidityRatio, enthalpy: enthalpy };
+          }).filter(function (p) { return Number.isFinite(p.temp) && Number.isFinite(p.enthalpy); });
+
+          let current3dPoint = null;
+          if (lublinCurrent && Number.isFinite(lublinCurrent.currentTemp) && Number.isFinite(lublinCurrent.currentRH) && isValidDate(lublinCurrent.currentTime)) {
+            const currentHumidityRatio = calculateHumidityRatio(lublinCurrent.currentTemp, lublinCurrent.currentRH, lublinCurrent.currentPressure || 1013.25);
+            const currentEnthalpy = calculateEnthalpy(lublinCurrent.currentTemp, currentHumidityRatio);
+            if (Number.isFinite(currentEnthalpy)) current3dPoint = { time: lublinCurrent.currentTime, temp: lublinCurrent.currentTemp, enthalpy: currentEnthalpy };
+          }
+
+          setProgress(92, 'Rysowanie wykresu Moliera 3D...');
+          renderMollier3D(history3dPoints, current3dPoint);
+
+          setProgress(95, 'Rysowanie górnego overlay 3D sensora...');
+          overlay3dRenderMs = await rerenderCurrentSensorOverlay3D();
+
+          setProgress(96, 'Rysowanie overlay 3D sensor + meteo...');
+          await rerenderCurrentSensorMeteoOverlay3D();
+
+          setProgress(97, 'Rysowanie pełnego overlay 3D sensora...');
+          await rerenderFullSensorOverlay3D();
+
+          setProgress(99, 'Rysowanie overlay 3D meteo...');
+          await rerenderCurrentMeteoOverlay3D();
+
+          setProgress(100, 'Gotowe.');
+          resizeAllCharts();
+          setTimeout(resizeAllCharts, 250);
+          setProgressTimes(fetchMs, overlay3dRenderMs);
+          el.status.textContent = 'OK | od ' + formatDateTime(range.start) + ' do ' + formatDateTime(range.end) + ' | S: ' + sensorData.y.length + ' | L: ' + lublinHistory.temp.length;
+        } catch (error) {
+          console.error(error);
+          setProgress(100, 'Błąd pobierania danych.');
+          setProgressTimes(performance.now() - fetchStart, overlay3dRenderMs);
+          el.status.textContent = 'Błąd pobierania';
+          el.mollier3dInfo.textContent = 'Nie udało się pobrać danych do wykresu Moliera 3D.';
+          el.sensorOverlay3dInfo.textContent = 'Nie udało się odświeżyć overlay 3D sensora.';
+          el.sensorOverlay3dFullInfo.textContent = 'Nie udało się odświeżyć pełnego overlay 3D sensora.';
+          el.sensorMeteoOverlay3dInfo.textContent = 'Nie udało się odświeżyć overlay 3D sensor + meteo.';
+          el.meteoOverlay3dInfo.textContent = 'Nie udało się odświeżyć overlay 3D meteo.';
+        }
+      }
+
+      function restartTimer() {
+        if (refreshTimer) clearInterval(refreshTimer);
+        if (!el.autoToggle.checked) return;
+        const intervalSec = parseInt(el.intervalSelect.value, 10);
+        refreshTimer = setInterval(renderDashboard, intervalSec * 1000);
+      }
+
+      function syncActiveRangeButtons() {
+        document.querySelectorAll('.btn[data-hours]').forEach(function (btn) {
+          const btnHours = parseInt(btn.dataset.hours, 10);
+          btn.classList.toggle('active', !useCustomRange && btnHours === currentRangeHours);
+        });
+      }
+
+      function syncSliderLabel() {
+        el.sliderHoursValue.textContent = formatHoursLabel(currentRangeHours);
+        el.hoursSlider.value = String(currentRangeHours);
+      }
+
+      function applyQuickRange(hours) {
+        chartUiRevision += 1;
+        useCustomRange = false;
+        currentRangeHours = hours;
+        syncActiveRangeButtons();
+        syncSliderLabel();
+        const range = getActiveRange();
+        el.startDate.value = toLocalInputValue(range.start);
+        el.endDate.value = toLocalInputValue(range.end);
+        renderDashboard();
+      }
+
+      function runSelfTests() {
+        console.assert(formatHoursLabel(24) === '24 h (1.00 dni)', 'Test formatHoursLabel nie przeszedł.');
+        const r = computePaddedYRange([1, 2, null, NaN, 'x']);
+        console.assert(Array.isArray(r) && r.length === 2 && r[0] < 1 && r[1] > 2, 'Test computePaddedYRange nie przeszedł.');
+        const stats = calculateStats([null, 1, 3, NaN]);
+        console.assert(stats && stats.min === 1 && stats.max === 3 && stats.avg === 2, 'Test calculateStats nie przeszedł.');
+        const smoothed = smoothNumericSeries([1, 2, 3], 1);
+        console.assert(smoothed.length === 3, 'Test smoothNumericSeries nie przeszedł.');
+        const prepared = prepareOverlay3DData({ x: [new Date('2026-03-29T01:00:00'), new Date('2026-03-29T02:00:00')], y: [20, 21] }, 'Sensor');
+        console.assert(prepared.dayKeys.length === 1, 'Test prepareOverlay3DData nie przeszedł.');
+        const overlayBuild = buildOverlay3DTraces(prepared, 1, { useSmoothing: false, showMarkers: true });
+        console.assert(overlayBuild.traces.length === 1, 'Test buildOverlay3DTraces nie przeszedł.');
+        sceneViewState.sensorOverlay3dChart = 'xz';
+        const cameraTest = getCameraFor3DView('sensorOverlay3dChart', 'orthographic');
+        console.assert(cameraTest.eye.y > 2 && cameraTest.up.z === 1, 'Test getCameraFor3DView dla X-Z nie przeszedł.');
+        sceneViewState.sensorOverlay3dChart = 'iso';
+        const combinedPrepared = prepareCombinedOverlay3DData(
+          { x: [new Date('2026-03-29T01:00:00')], y: [20] },
+          { x: [new Date('2026-03-29T01:00:00')], temp: [7] }
+        );
+        const combinedBuild = buildCombinedOverlay3DTraces(combinedPrepared, 1, { useSmoothing: false, showMarkers: false });
+        console.assert(combinedBuild.traces.length === 2, 'Test buildCombinedOverlay3DTraces nie przeszedł.');
+        console.assert(getLegendVisible('sensorOverlay3dChart') === true, 'Test getLegendVisible nie przeszedł.');
+      }
+
+      function bindUi() {
+        document.querySelectorAll('.btn[data-hours]').forEach(function (button) {
+          button.addEventListener('click', function () { applyQuickRange(parseInt(button.dataset.hours, 10)); });
+        });
+
+        el.hoursSlider.addEventListener('input', function () {
+          useCustomRange = false;
+          currentRangeHours = parseInt(el.hoursSlider.value, 10);
+          syncActiveRangeButtons();
+          syncSliderLabel();
+        });
+
+        el.hoursSlider.addEventListener('change', function () {
+          chartUiRevision += 1;
+          const range = getActiveRange();
+          el.startDate.value = toLocalInputValue(range.start);
+          el.endDate.value = toLocalInputValue(range.end);
+          renderDashboard();
+        });
+
+        el.applyRangeBtn.addEventListener('click', function () {
+          if (!el.startDate.value || !el.endDate.value) {
+            alert('Ustaw oba pola: od i do.');
+            return;
+          }
+          const start = new Date(el.startDate.value);
+          const end = new Date(el.endDate.value);
+          if (!(start < end)) {
+            alert('Data końcowa musi być późniejsza niż początkowa.');
+            return;
+          }
+          useCustomRange = true;
+          syncActiveRangeButtons();
+          chartUiRevision += 1;
+          renderDashboard();
+        });
+
+        el.resetRangeBtn.addEventListener('click', function () { applyQuickRange(currentRangeHours); });
+        el.autoToggle.addEventListener('change', restartTimer);
+        el.intervalSelect.addEventListener('change', restartTimer);
+        el.refreshBtn.addEventListener('click', function () { chartUiRevision += 1; renderDashboard(); });
+
+        el.overlayDaysSlider.addEventListener('input', function () {
+          overlayCompareDays = parseInt(el.overlayDaysSlider.value, 10);
+          el.overlayDaysValue.textContent = formatDaysText(overlayCompareDays) + ' / max ' + overlayCompareDaysMax;
+        });
+        el.overlayDaysSlider.addEventListener('change', function () {
+          overlayCompareDays = parseInt(el.overlayDaysSlider.value, 10);
+          chartUiRevision += 1;
+          renderDashboard();
+        });
+
+        el.sensorOverlay3dDaysSlider.addEventListener('input', function () {
+          sensor3dOverlayAutoMaxPending = false;
+          sensor3dOverlayDays = parseInt(el.sensorOverlay3dDaysSlider.value, 10);
+          el.sensorOverlay3dDaysValue.textContent = formatDaysText(sensor3dOverlayDays) + ' / max ' + sensorAvailableDaysMax;
+        });
+        el.sensorOverlay3dDaysSlider.addEventListener('change', function () {
+          sensor3dOverlayAutoMaxPending = false;
+          sensor3dOverlayDays = parseInt(el.sensorOverlay3dDaysSlider.value, 10);
+          rerenderCurrentSensorOverlay3D();
+        });
+        el.sensorOverlay3dProjection.addEventListener('change', function () {
+          sensor3dProjectionMode = el.sensorOverlay3dProjection.value;
+          rerenderCurrentSensorOverlay3D();
+        });
+
+        el.sensorOverlay3dFullDaysSlider.addEventListener('input', function () {
+          sensor3dFullOverlayDays = parseInt(el.sensorOverlay3dFullDaysSlider.value, 10);
+          el.sensorOverlay3dFullDaysValue.textContent = formatDaysText(sensor3dFullOverlayDays) + ' / max ' + sensorFullAvailableDaysMax;
+        });
+        el.sensorOverlay3dFullDaysSlider.addEventListener('change', function () {
+          sensor3dFullOverlayDays = parseInt(el.sensorOverlay3dFullDaysSlider.value, 10);
+          rerenderFullSensorOverlay3D();
+        });
+        el.sensorOverlay3dFullProjection.addEventListener('change', function () {
+          sensor3dFullProjectionMode = el.sensorOverlay3dFullProjection.value;
+          rerenderFullSensorOverlay3D();
+        });
+
+        el.sensorMeteoOverlay3dDaysSlider.addEventListener('input', function () {
+          sensorMeteo3dOverlayAutoMaxPending = false;
+          sensorMeteo3dOverlayDays = parseInt(el.sensorMeteoOverlay3dDaysSlider.value, 10);
+          el.sensorMeteoOverlay3dDaysValue.textContent = formatDaysText(sensorMeteo3dOverlayDays) + ' / max ' + sensorMeteoAvailableDaysMax;
+        });
+        el.sensorMeteoOverlay3dDaysSlider.addEventListener('change', function () {
+          sensorMeteo3dOverlayAutoMaxPending = false;
+          sensorMeteo3dOverlayDays = parseInt(el.sensorMeteoOverlay3dDaysSlider.value, 10);
+          rerenderCurrentSensorMeteoOverlay3D();
+        });
+        el.sensorMeteoOverlay3dProjection.addEventListener('change', function () {
+          sensorMeteo3dProjectionMode = el.sensorMeteoOverlay3dProjection.value;
+          rerenderCurrentSensorMeteoOverlay3D();
+        });
+
+        el.meteoOverlay3dDaysSlider.addEventListener('input', function () {
+          meteo3dOverlayAutoMaxPending = false;
+          meteo3dOverlayDays = parseInt(el.meteoOverlay3dDaysSlider.value, 10);
+          el.meteoOverlay3dDaysValue.textContent = formatDaysText(meteo3dOverlayDays) + ' / max ' + meteoAvailableDaysMax;
+        });
+        el.meteoOverlay3dDaysSlider.addEventListener('change', function () {
+          meteo3dOverlayAutoMaxPending = false;
+          meteo3dOverlayDays = parseInt(el.meteoOverlay3dDaysSlider.value, 10);
+          rerenderCurrentMeteoOverlay3D();
+        });
+        el.meteoOverlay3dProjection.addEventListener('change', function () {
+          meteo3dProjectionMode = el.meteoOverlay3dProjection.value;
+          rerenderCurrentMeteoOverlay3D();
+        });
+
+        document.querySelectorAll('[data-3d-chart][data-3d-view]').forEach(function (button) {
+          button.addEventListener('click', function () {
+            const chartId = button.getAttribute('data-3d-chart');
+            const view = button.getAttribute('data-3d-view');
+            set3DPlaneView(chartId, view);
+          });
+        });
+
+        document.querySelectorAll('[data-3d-chart][data-3d-legend="toggle"]').forEach(function (button) {
+          const chartId = button.getAttribute('data-3d-chart');
+          updateLegendButtonText(button, chartId);
+          button.addEventListener('click', function () {
+            legendVisibleState[chartId] = !getLegendVisible(chartId);
+            updateLegendButtonText(button, chartId);
+            safePlotlyRelayout(chartId, { showlegend: getLegendVisible(chartId) });
+          });
+        });
+
+        let resizeTimer = null;
+        window.addEventListener('resize', function () {
+          if (resizeTimer) clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(resizeAllCharts, 180);
+        });
+
+        el.exportButton.addEventListener('click', handleExport);
+      }
+
+      async function initializeDashboard() {
+        assertElements();
+        validateRuntimeEnvironment();
+        runSelfTests();
+        bindUi();
+        const now = new Date();
+        const defaultStart = new Date(DEFAULT_START_DATE_STR);
+        useCustomRange = true;
+        el.startDate.value = toLocalInputValue(defaultStart);
+        el.endDate.value = toLocalInputValue(now);
+        const totalHours = Math.max(1, Math.ceil((now.getTime() - defaultStart.getTime()) / (60 * 60 * 1000)));
+        currentRangeHours = totalHours;
+        el.hoursSlider.max = String(Math.max(720, totalHours));
+        el.hoursSlider.value = String(totalHours);
+        el.sliderHoursValue.textContent = formatHoursLabel(totalHours);
+        syncActiveRangeButtons();
+        sensor3dOverlayAutoMaxPending = true;
+        sensorMeteo3dOverlayAutoMaxPending = true;
+        meteo3dOverlayAutoMaxPending = true;
+        await renderDashboard();
+        restartTimer();
+      }
+
+      initializeDashboard().catch(function (error) {
+        console.error(error);
+        el.status.textContent = 'Błąd inicjalizacji';
+        setProgress(100, 'Błąd inicjalizacji.');
+      });
+    })();
+  </script>
+</body>
+</html>
+<!--
+Nazwa: Dashboard temperatury PRO z analizą, wykresami 2D i 3D oraz eksportem danych
+Cel:
+- Wyświetlanie danych temperatury z ThingSpeak w formie rozbudowanego dashboardu.
+- Porównanie temperatury sensora z danymi dla Lublina i z linią modelu pogodowego.
+- Pokazanie dwóch wariantów głównego wykresu temperatury:
+  1) wersji pełnej: sensor + Lublin + model,
+  2) wersji skupionej na sensorze, z Lublinem i modelem ukrytymi domyślnie.
+- Pokazanie trzech overlayów 3D:
+  1) sensor z bieżącego zakresu,
+  2) sensor z pełnego zbioru danych,
+  3) meteo z bieżącego zakresu.
+- Udostępnienie eksportu danych do CSV i XLSX.
+Użycie:
+- Podmień aktualny plik index.html w repozytorium GitHub Pages.
+- Otwórz stronę w przeglądarce.
+- Ustaw zakres czasu szybkimi przyciskami, suwakiem albo polami od-do.
+- Dodatkowe suwaki 3D sterują liczbą dni w overlayach.
+Uruchomienie:
+- GitHub Pages: po zapisaniu zmian i odczekaniu chwili strona będzie dostępna online.
+- Lokalnie: można otworzyć plik index.html bezpośrednio w przeglądarce.
+Wymagania:
+- Przeglądarka z obsługą JavaScript.
+- Dostęp do Internetu.
+- Kanał ThingSpeak z danymi temperatury.
+- CDN Plotly oraz biblioteka SheetJS do eksportu XLSX.
+Wynik:
+- Zestaw wykresów 2D i 3D.
+- Eksport danych bieżących i pełnych do pliku.
+Zatrzymanie:
+- Wyłączenie automatycznego odświeżania lub zamknięcie strony.
+Uwagi:
+- Dane z ThingSpeak są tylko odczytywane.
+- Dla kanału prywatnego używany jest READ_API_KEY.
+- ThingSpeak ma limit 8000 rekordów na pojedyncze żądanie, dlatego dłuższe zakresy
+  są pobierane partiami w oknach dobowych.
+- Wersja „pełny overlay 3D” używa osobnego, możliwie pełnego zbioru danych sensora.
+- W overlayach 3D zastosowano delikatne wygładzanie przez lekką średnią kroczącą,
+  bez agresywnego zaokrąglania toru.
+Data: 2026-04-08
+Status: narzędzie
+
+Założenia i interpretacja działania:
+- ESP zapisuje dane do ThingSpeak.
+- Strona pełni rolę interfejsu analitycznego.
+- ThingSpeak zwraca created_at w UTC.
+- Open-Meteo dla danych godzinowych jest pobierane w GMT, aby było zgodne z UTC z ThingSpeak.
+- Widok wykresów ma być możliwie stabilny i czytelny również na telefonie.
+- Strona ma nie przesuwać się poziomo przy przypadkowym skalowaniu.
+- Dane 3D są przygotowywane od razu po pobraniu, aby zmiana projekcji i kropek była natychmiastowa.
+-->
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>Dashboard temperatury PRO</title>
+
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #0f172a;
+      --border: #243146;
+      --text: #e5edf8;
+      --muted: #9fb0c8;
+      --accent: #4f8cff;
+      --accent-2: #22c55e;
+      --accent-3: #f59e0b;
+      --accent-4: #38bdf8;
+      --accent-5: #f472b6;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --shadow: rgba(0, 0, 0, 0.28);
+      --page-pad: clamp(8px, 1.8vw, 16px);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      max-width: 100%;
+      overflow-x: hidden;
+      background:
+        radial-gradient(circle at top right, #1a2a4a 0%, transparent 28%),
+        linear-gradient(180deg, var(--bg) 0%, #08101d 100%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      min-height: 100%;
+      touch-action: manipulation;
+    }
+
+    body { padding: var(--page-pad); }
+
+    .dashboard {
+      display: grid;
+      gap: 12px;
+      min-height: calc(100vh - 2 * var(--page-pad));
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 100%;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(11, 18, 32, 0.98));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 12px 28px var(--shadow);
+      overflow: hidden;
+    }
+
+    .top-controls { padding: 12px; display: grid; gap: 10px; }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .row-left, .row-right {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn, .select, .dt-input {
+      border: 1px solid var(--border);
+      background: #121b2c;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 9px 12px;
+      cursor: pointer;
+      font-size: 14px;
+      min-height: 40px;
+    }
+
+    .btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .btn-big {
+      width: 100%;
+      min-height: 54px;
+      font-size: 17px;
+      font-weight: 700;
+      background: linear-gradient(180deg, #2563eb, #1d4ed8);
+      border-color: #3b82f6;
+      color: white;
+    }
+
+    .toggle-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 14px;
+      padding: 0 4px;
+    }
+
+    .status { color: var(--muted); font-size: 13px; white-space: nowrap; }
+    .slider-wrap { display: grid; gap: 8px; }
+
+    .progress-wrap { display: grid; gap: 8px; padding-top: 2px; }
+
+    .progress-bar {
+      width: 100%;
+      height: 12px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: #121b2c;
+      border: 1px solid var(--border);
+    }
+
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #2563eb 0%, #38bdf8 100%);
+      transition: width 0.2s ease;
+    }
+
+    .progress-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .slider-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .range-slider { width: 100%; accent-color: var(--accent); cursor: pointer; }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(10, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    @media (max-width: 1700px) { .summary-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+    @media (max-width: 950px) { .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 520px) { .summary-grid { grid-template-columns: 1fr; } }
+
+    .metric-card { padding: 14px; }
+    .metric-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .metric-value { font-size: clamp(20px, 2.2vw, 30px); font-weight: 800; line-height: 1.05; }
+    .metric-note { margin-top: 8px; font-size: 12px; color: var(--muted); line-height: 1.35; }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1.7fr 1fr;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    @media (max-width: 1280px) { .main-grid { grid-template-columns: 1fr; } }
+
+    .chart-card, .side-card { padding: 10px; }
+    .chart-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      padding: 4px 6px 10px 6px;
+      flex-wrap: wrap;
+    }
+    .chart-title { font-size: 17px; font-weight: 700; }
+    .chart-subtitle { color: var(--muted); font-size: 13px; }
+
+    .stack {
+      display: grid;
+      gap: 12px;
+      height: 100%;
+      grid-template-columns: 1fr 1fr;
+    }
+    @media (max-width: 700px) { .stack { grid-template-columns: 1fr; } }
+
+    .plot-frame {
+      margin: 0 auto;
+      width: min(100%, calc(100vw - 28px));
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 6px;
+      background: rgba(255,255,255,0.015);
+      overflow: hidden;
+    }
+
+    #mainChart, #mainChartSensorFocus { width: 100%; height: min(58vh, 620px); min-height: 420px; }
+    #histChart, #meteoChart { width: 100%; height: min(40vh, 430px); min-height: 320px; }
+    #overlayChart, #mollierChart { width: 100%; height: min(82vh, 920px); min-height: 620px; }
+    #mollier3dChart, #sensorOverlay3dChart, #sensorMeteoOverlay3dChart, #sensorOverlay3dFullChart, #meteoOverlay3dChart {
+      width: 100%;
+      height: min(88vh, 980px);
+      min-height: 680px;
+    }
+
+    .analysis-box {
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .analysis-title { font-size: 12px; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .analysis-value { font-size: 20px; font-weight: 700; }
+    .analysis-sub { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.35; }
+
+    .overlay-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .info-line { margin-top: 2px; color: var(--muted); font-size: 12px; line-height: 1.3; padding: 0 6px 6px 6px; }
+    .up { color: var(--warn); }
+    .down { color: var(--accent-2); }
+    .flat { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <section class="card top-controls">
+      <div class="row">
+        <div class="row-left">
+          <button class="btn" data-hours="1">1 h</button>
+          <button class="btn" data-hours="3">3 h</button>
+          <button class="btn" data-hours="6">6 h</button>
+          <button class="btn active" data-hours="8">8 h</button>
+          <button class="btn" data-hours="12">12 h</button>
+          <button class="btn" data-hours="24">24 h</button>
+          <button class="btn" data-hours="72">3 dni</button>
+          <button class="btn" data-hours="168">7 dni</button>
+        </div>
+        <div class="row-right">
+          <label class="toggle-wrap"><span>AUTO</span><input id="autoToggle" type="checkbox" /></label>
+          <select id="intervalSelect" class="select">
+            <option value="10">10 s</option>
+            <option value="20" selected>20 s</option>
+            <option value="30">30 s</option>
+            <option value="60">60 s</option>
+          </select>
+          <button id="refreshBtn" class="btn">Odśwież</button>
+          <div id="status" class="status">Start...</div>
+        </div>
+      </div>
+
+      <div class="slider-wrap">
+        <div class="slider-head">
+          <div>Zakres czasu suwakiem</div>
+          <div id="sliderHoursValue">8 h (0.33 dni)</div>
+        </div>
+        <input id="hoursSlider" class="range-slider" type="range" min="1" max="720" step="1" value="8" />
+      </div>
+
+      <div class="row">
+        <div class="row-left">
+          <label for="startDate">Od:</label>
+          <input id="startDate" class="dt-input" type="datetime-local" />
+          <label for="endDate">Do:</label>
+          <input id="endDate" class="dt-input" type="datetime-local" />
+          <button id="applyRangeBtn" class="btn">Zastosuj okres</button>
+          <button id="resetRangeBtn" class="btn">Wróć do szybkiego zakresu</button>
+        </div>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+        <div class="progress-meta">
+          <div id="progressText" class="status">Gotowość.</div>
+          <div id="progressTimes" class="status">Pobieranie: — | Overlay 3D: —</div>
+          <div id="progressCounts" class="status">Próbki: sensor — | meteo —</div>
+        </div>
       </div>
     </section>
 
