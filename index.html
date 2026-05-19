@@ -6,9 +6,10 @@ Cel:
 - Pokazanie dwóch wariantów głównego wykresu temperatury:
   1) wersji pełnej: sensor + Lublin + model,
   2) wersji skupionej na sensorze, z Lublinem i modelem ukrytymi domyślnie.
-- Pokazanie dwóch niezależnych wykresów overlay 3D sensora:
-  1) z aktualnie pobranego zakresu danych,
-  2) z możliwie pełnego zakresu danych sensora, z osobnym suwakiem i trybem projekcji.
+- Pokazanie trzech overlayów 3D:
+  1) sensor z bieżącego zakresu,
+  2) sensor z pełnego zbioru danych,
+  3) meteo z bieżącego zakresu.
 - Udostępnienie eksportu danych do CSV i XLSX.
 Użycie:
 - Podmień aktualny plik index.html w repozytorium GitHub Pages.
@@ -34,8 +35,8 @@ Uwagi:
 - ThingSpeak ma limit 8000 rekordów na pojedyncze żądanie, dlatego dłuższe zakresy
   są pobierane partiami w oknach dobowych.
 - Wersja „pełny overlay 3D” używa osobnego, możliwie pełnego zbioru danych sensora.
-- W overlayach 3D zastosowano delikatne wygładzanie przez interpolację liniową + tryb spline,
-  ale bez przesadnego zaokrąglania, aby nie fałszować przebiegu.
+- W overlayach 3D zastosowano delikatne wygładzanie przez lekką średnią kroczącą,
+  bez agresywnego zaokrąglania toru.
 Data: 2026-04-08
 Status: narzędzie
 
@@ -46,11 +47,22 @@ Założenia i interpretacja działania:
 - Open-Meteo dla danych godzinowych jest pobierane w GMT, aby było zgodne z UTC z ThingSpeak.
 - Widok wykresów ma być możliwie stabilny i czytelny również na telefonie.
 - Strona ma nie przesuwać się poziomo przy przypadkowym skalowaniu.
---><!DOCTYPE html><html lang="pl">
+- Dane 3D są przygotowywane od razu po pobraniu, aby zmiana projekcji i kropek była natychmiastowa.
+-->
+<!DOCTYPE html>
+<html lang="pl">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-  <title>Dashboard temperatury PRO</title>  <!-- Biblioteka do wykresów -->  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>  <!-- Biblioteka do eksportu XLSX -->  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>  <style>
+  <title>Dashboard temperatury PRO</title>
+
+  <!-- Biblioteka do wykresów -->
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+  <!-- Biblioteka do eksportu XLSX -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+  <style>
     :root {
       --bg: #0b1220;
       --panel: #0f172a;
@@ -68,9 +80,7 @@ Założenia i interpretacja działania:
       --page-pad: clamp(8px, 1.8vw, 16px);
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     html, body {
       margin: 0;
@@ -86,9 +96,7 @@ Założenia i interpretacja działania:
       touch-action: manipulation;
     }
 
-    body {
-      padding: var(--page-pad);
-    }
+    body { padding: var(--page-pad); }
 
     .dashboard {
       display: grid;
@@ -172,10 +180,7 @@ Założenia i interpretacja działania:
       white-space: nowrap;
     }
 
-    .slider-wrap {
-      display: grid;
-      gap: 8px;
-    }
+    .slider-wrap { display: grid; gap: 8px; }
 
     .progress-wrap {
       display: grid;
@@ -228,21 +233,11 @@ Założenia i interpretacja działania:
       gap: 12px;
     }
 
-    @media (max-width: 1700px) {
-      .summary-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-    }
+    @media (max-width: 1700px) { .summary-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+    @media (max-width: 950px) { .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 520px) { .summary-grid { grid-template-columns: 1fr; } }
 
-    @media (max-width: 950px) {
-      .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-
-    @media (max-width: 520px) {
-      .summary-grid { grid-template-columns: 1fr; }
-    }
-
-    .metric-card {
-      padding: 14px;
-    }
+    .metric-card { padding: 14px; }
 
     .metric-label {
       font-size: 12px;
@@ -272,13 +267,9 @@ Założenia i interpretacja działania:
       align-items: stretch;
     }
 
-    @media (max-width: 1280px) {
-      .main-grid { grid-template-columns: 1fr; }
-    }
+    @media (max-width: 1280px) { .main-grid { grid-template-columns: 1fr; } }
 
-    .chart-card, .side-card {
-      padding: 10px;
-    }
+    .chart-card, .side-card { padding: 10px; }
 
     .chart-head {
       display: flex;
@@ -289,15 +280,8 @@ Założenia i interpretacja działania:
       flex-wrap: wrap;
     }
 
-    .chart-title {
-      font-size: 17px;
-      font-weight: 700;
-    }
-
-    .chart-subtitle {
-      color: var(--muted);
-      font-size: 13px;
-    }
+    .chart-title { font-size: 17px; font-weight: 700; }
+    .chart-subtitle { color: var(--muted); font-size: 13px; }
 
     .stack {
       display: grid;
@@ -306,14 +290,8 @@ Założenia i interpretacja działania:
       grid-template-columns: 1fr 1fr;
     }
 
-    @media (max-width: 700px) {
-      .stack { grid-template-columns: 1fr; }
-    }
+    @media (max-width: 700px) { .stack { grid-template-columns: 1fr; } }
 
-    /*
-      Ramka pomocnicza dla wykresów.
-      Dzięki niej na telefonie wykres nie styka się bezpośrednio z brzegiem karty.
-    */
     .plot-frame {
       margin: 0 auto;
       width: min(100%, calc(100vw - 28px));
@@ -324,8 +302,7 @@ Założenia i interpretacja działania:
       overflow: hidden;
     }
 
-    #mainChart,
-    #mainChartSensorFocus {
+    #mainChart, #mainChartSensorFocus {
       width: 100%;
       height: min(58vh, 620px);
       min-height: 420px;
@@ -343,9 +320,7 @@ Założenia i interpretacja działania:
       min-height: 620px;
     }
 
-    #mollier3dChart,
-    #sensorOverlay3dChart,
-    #sensorOverlay3dFullChart {
+    #mollier3dChart, #sensorOverlay3dChart, #sensorOverlay3dFullChart, #meteoOverlay3dChart {
       width: 100%;
       height: min(88vh, 980px);
       min-height: 680px;
@@ -366,10 +341,7 @@ Założenia i interpretacja działania:
       letter-spacing: 0.05em;
     }
 
-    .analysis-value {
-      font-size: 20px;
-      font-weight: 700;
-    }
+    .analysis-value { font-size: 20px; font-weight: 700; }
 
     .analysis-sub {
       margin-top: 6px;
@@ -396,243 +368,265 @@ Założenia i interpretacja działania:
     .up { color: var(--warn); }
     .down { color: var(--accent-2); }
     .flat { color: var(--muted); }
-  </style></head>
+  </style>
+</head>
 <body>
-  <div class="dashboard"><!-- ===================================================================== -->
-<!-- GÓRNE USTAWIENIA STRONY                                                 -->
-<!-- ===================================================================== -->
-<section class="card top-controls">
-  <div class="row">
-    <div class="row-left">
-      <button class="btn" data-hours="1">1 h</button>
-      <button class="btn" data-hours="3">3 h</button>
-      <button class="btn" data-hours="6">6 h</button>
-      <button class="btn active" data-hours="8">8 h</button>
-      <button class="btn" data-hours="12">12 h</button>
-      <button class="btn" data-hours="24">24 h</button>
-      <button class="btn" data-hours="72">3 dni</button>
-      <button class="btn" data-hours="168">7 dni</button>
-    </div>
+  <div class="dashboard">
 
-    <div class="row-right">
-      <label class="toggle-wrap">
-        <span>AUTO</span>
-        <input id="autoToggle" type="checkbox" />
-      </label>
+    <!-- GÓRNE USTAWIENIA STRONY -->
+    <section class="card top-controls">
+      <div class="row">
+        <div class="row-left">
+          <button class="btn" data-hours="1">1 h</button>
+          <button class="btn" data-hours="3">3 h</button>
+          <button class="btn" data-hours="6">6 h</button>
+          <button class="btn active" data-hours="8">8 h</button>
+          <button class="btn" data-hours="12">12 h</button>
+          <button class="btn" data-hours="24">24 h</button>
+          <button class="btn" data-hours="72">3 dni</button>
+          <button class="btn" data-hours="168">7 dni</button>
+        </div>
 
-      <select id="intervalSelect" class="select">
-        <option value="10">10 s</option>
-        <option value="20" selected>20 s</option>
-        <option value="30">30 s</option>
-        <option value="60">60 s</option>
-      </select>
+        <div class="row-right">
+          <label class="toggle-wrap">
+            <span>AUTO</span>
+            <input id="autoToggle" type="checkbox" />
+          </label>
 
-      <button id="refreshBtn" class="btn">Odśwież</button>
-      <div id="status" class="status">Start...</div>
-    </div>
-  </div>
+          <select id="intervalSelect" class="select">
+            <option value="10">10 s</option>
+            <option value="20" selected>20 s</option>
+            <option value="30">30 s</option>
+            <option value="60">60 s</option>
+          </select>
 
-  <div class="slider-wrap">
-    <div class="slider-head">
-      <div>Zakres czasu suwakiem</div>
-      <div id="sliderHoursValue">8 h (0.33 dni)</div>
-    </div>
-    <input id="hoursSlider" class="range-slider" type="range" min="1" max="720" step="1" value="8" />
-  </div>
+          <button id="refreshBtn" class="btn">Odśwież</button>
+          <div id="status" class="status">Start...</div>
+        </div>
+      </div>
 
-  <div class="row">
-    <div class="row-left">
-      <label for="startDate">Od:</label>
-      <input id="startDate" class="dt-input" type="datetime-local" />
-      <label for="endDate">Do:</label>
-      <input id="endDate" class="dt-input" type="datetime-local" />
-      <button id="applyRangeBtn" class="btn">Zastosuj okres</button>
-      <button id="resetRangeBtn" class="btn">Wróć do szybkiego zakresu</button>
-    </div>
-  </div>
+      <div class="slider-wrap">
+        <div class="slider-head">
+          <div>Zakres czasu suwakiem</div>
+          <div id="sliderHoursValue">8 h (0.33 dni)</div>
+        </div>
+        <input id="hoursSlider" class="range-slider" type="range" min="1" max="720" step="1" value="8" />
+      </div>
+
+      <div class="row">
+        <div class="row-left">
+          <label for="startDate">Od:</label>
+          <input id="startDate" class="dt-input" type="datetime-local" />
+          <label for="endDate">Do:</label>
+          <input id="endDate" class="dt-input" type="datetime-local" />
+          <button id="applyRangeBtn" class="btn">Zastosuj okres</button>
+          <button id="resetRangeBtn" class="btn">Wróć do szybkiego zakresu</button>
+        </div>
+      </div>
 
       <div class="progress-wrap">
         <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
         <div class="progress-meta">
           <div id="progressText" class="status">Gotowość.</div>
           <div id="progressTimes" class="status">Pobieranie: — | Overlay 3D: —</div>
+          <div id="progressCounts" class="status">Próbki: sensor — | meteo —</div>
         </div>
       </div>
     </section>
 
-<!-- ===================================================================== -->
-<!-- OVERLAY 3D DLA AKTUALNIE POBRANEGO ZAKRESU                              -->
-<!-- ===================================================================== -->
-<section class="card chart-card">
-  <div class="chart-head">
-    <div>
-      <div class="chart-title">Sensor overlay 3D</div>
-      <div class="chart-subtitle">Tylko temperatura sensora, nakładka dobowa w 3D: X = dzień, Y = godzina, Z = temperatura</div>
-    </div>
-    <div class="overlay-controls">
-      <label for="sensorOverlay3dDaysSlider">Liczba dni:</label>
-      <input id="sensorOverlay3dDaysSlider" class="range-slider" type="range" min="1" max="1" step="1" value="1" style="width: 220px;" />
-      <div id="sensorOverlay3dDaysValue" class="status">1 dzień</div>
-    </div>
-  </div>
-  <div class="plot-frame"><div id="sensorOverlay3dChart"></div></div>
-  <div id="sensorOverlay3dInfo" class="info-line">Oczekiwanie na dane...</div>
-</section>
-
-<!-- ===================================================================== -->
-<!-- WERSJA GŁÓWNEGO WYKRESU Z UKRYTYMI DOMYŚLNIE SERIAMI LUBLIN I MODEL     -->
-<!-- ===================================================================== -->
-<section class="card chart-card">
-  <div class="chart-head">
-    <div>
-      <div class="chart-title">Temperatura: sensor + Lublin + model (widok skupiony na sensorze)</div>
-      <div class="chart-subtitle">Lublin i model są ukryte domyślnie, ale można je włączyć z legendy</div>
-    </div>
-  </div>
-  <div class="plot-frame"><div id="mainChartSensorFocus"></div></div>
-  <div class="info-line">Domyślnie widoczna jest wyłącznie linia sensora.</div>
-</section>
-
-<!-- ===================================================================== -->
-<!-- KAFELKI PODSUMOWANIA                                                    -->
-<!-- ===================================================================== -->
-<section class="summary-grid">
-  <div class="card metric-card"><div class="metric-label">Sensor teraz</div><div id="currentTemp" class="metric-value">--.-- °C</div><div id="lastTime" class="metric-note">Ostatni punkt: —</div></div>
-  <div class="card metric-card"><div class="metric-label">Lublin teraz</div><div id="outsideTemp" class="metric-value">--.-- °C</div><div id="outsideInfo" class="metric-note">Dane zewnętrzne: —</div></div>
-  <div class="card metric-card"><div class="metric-label">Punkt rosy</div><div id="outsideDewPoint" class="metric-value">--.-- °C</div><div class="metric-note">Wyliczony z temperatury i RH</div></div>
-  <div class="card metric-card"><div class="metric-label">Wilgotność względna</div><div id="outsideRH" class="metric-value">--.-- %</div><div class="metric-note">Dane pogodowe dla Lublina</div></div>
-  <div class="card metric-card"><div class="metric-label">Wilgotność bezwzględna</div><div id="outsideAH" class="metric-value">--.-- g/m³</div><div class="metric-note">Wyliczona z temperatury i RH</div></div>
-  <div class="card metric-card"><div class="metric-label">Ciśnienie</div><div id="outsidePressure" class="metric-value">--.-- hPa</div><div class="metric-note">Ciśnienie zredukowane do poziomu morza</div></div>
-  <div class="card metric-card"><div class="metric-label">Wschód słońca</div><div id="sunriseValue" class="metric-value">--:--</div><div class="metric-note">Lublin, czas lokalny Polski</div></div>
-  <div class="card metric-card"><div class="metric-label">Zachód słońca</div><div id="sunsetValue" class="metric-value">--:--</div><div class="metric-note">Lublin, czas lokalny Polski</div></div>
-  <div class="card metric-card"><div class="metric-label">Ocena warunków</div><div id="comfortValue" class="metric-value">Brak danych</div><div id="comfortSub" class="metric-note">Panel pokaże orientacyjną ocenę po pobraniu danych.</div></div>
-  <div class="card metric-card"><div class="metric-label">Liczba punktów</div><div id="pointCountsSummary" class="metric-value">S: -- | L: --</div><div class="metric-note">S = sensor, L = Lublin</div></div>
-</section>
-
-<!-- ===================================================================== -->
-<!-- GŁÓWNY WYKRES 2D + PANEL ANALITYCZNY                                   -->
-<!-- ===================================================================== -->
-<section class="main-grid">
-  <section class="card chart-card">
-    <div class="chart-head">
-      <div>
-        <div class="chart-title">Temperatura: sensor + Lublin + model</div>
-        <div class="chart-subtitle">Linia modelu Lublina od początku zakresu aż w przyszłość</div>
+    <!-- OVERLAY 3D SENSOR Z BIEŻĄCEGO ZAKRESU -->
+    <section class="card chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">Sensor overlay 3D</div>
+          <div class="chart-subtitle">Tylko temperatura sensora, nakładka dobowa w 3D: X = dzień, Y = godzina, Z = temperatura</div>
+        </div>
+        <div class="overlay-controls">
+          <label for="sensorOverlay3dDaysSlider">Liczba dni:</label>
+          <input id="sensorOverlay3dDaysSlider" class="range-slider" type="range" min="1" max="1" step="1" value="1" style="width: 220px;" />
+          <div id="sensorOverlay3dDaysValue" class="status">1 dzień</div>
+          <label for="sensorOverlay3dProjection" style="margin-left: 8px;">Projekcja:</label>
+          <select id="sensorOverlay3dProjection" class="select">
+            <option value="perspective" selected>Perspektywiczna</option>
+            <option value="orthographic">Nieperspektywiczna</option>
+          </select>
+          <label class="toggle-wrap" style="margin-left: 8px;">
+            <span>Kropki</span>
+            <input id="sensorOverlay3dDotsToggle" type="checkbox" checked />
+          </label>
+        </div>
       </div>
-    </div>
-    <div class="plot-frame"><div id="mainChart"></div></div>
-  </section>
+      <div class="plot-frame"><div id="sensorOverlay3dChart"></div></div>
+      <div id="sensorOverlay3dInfo" class="info-line">Oczekiwanie na dane...</div>
+    </section>
 
-  <section class="card side-card">
-    <div class="stack">
-      <div class="analysis-box"><div class="analysis-title">Sensor: minimum</div><div id="sensorMin" class="analysis-value">--</div><div class="analysis-sub">Najniższa wartość sensora w zakresie</div></div>
-      <div class="analysis-box"><div class="analysis-title">Lublin: minimum</div><div id="lublinMin" class="analysis-value">--</div><div class="analysis-sub">Najniższa temperatura zewnętrzna w zakresie</div></div>
-      <div class="analysis-box"><div class="analysis-title">Sensor: maksimum</div><div id="sensorMax" class="analysis-value">--</div><div class="analysis-sub">Najwyższa wartość sensora w zakresie</div></div>
-      <div class="analysis-box"><div class="analysis-title">Lublin: maksimum</div><div id="lublinMax" class="analysis-value">--</div><div class="analysis-sub">Najwyższa temperatura zewnętrzna w zakresie</div></div>
-      <div class="analysis-box"><div class="analysis-title">Sensor: średnia / amplituda</div><div id="sensorAvg" class="analysis-value">--</div><div id="sensorAmplitude" class="analysis-sub">--</div></div>
-      <div class="analysis-box"><div class="analysis-title">Lublin: średnia / amplituda</div><div id="lublinAvg" class="analysis-value">--</div><div id="lublinAmplitude" class="analysis-sub">--</div></div>
-      <div class="analysis-box"><div class="analysis-title">Sensor: trend</div><div id="sensorTrend" class="analysis-value">--</div><div id="sensorTrendNote" class="analysis-sub">Brak danych.</div></div>
-      <div class="analysis-box"><div class="analysis-title">Lublin: trend</div><div id="lublinTrend" class="analysis-value">--</div><div id="lublinTrendNote" class="analysis-sub">Brak danych.</div></div>
-      <div class="analysis-box"><div class="analysis-title">Punkty sensora</div><div id="sensorPointCount" class="analysis-value">--</div><div class="analysis-sub">Punkty po przetworzeniu do wykresu</div></div>
-      <div class="analysis-box"><div class="analysis-title">Punkty Lublina</div><div id="lublinPointCount" class="analysis-value">--</div><div class="analysis-sub">Punkty historyczne meteo w zakresie</div></div>
-    </div>
-  </section>
-</section>
+    <!-- WERSJA GŁÓWNEGO WYKRESU Z UKRYTYMI DOMYŚLNIE SERIAMI -->
+    <section class="card chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">Temperatura: sensor + Lublin + model (widok skupiony na sensorze)</div>
+          <div class="chart-subtitle">Lublin i model są ukryte domyślnie, ale można je włączyć z legendy</div>
+        </div>
+      </div>
+      <div class="plot-frame"><div id="mainChartSensorFocus"></div></div>
+      <div class="info-line">Domyślnie widoczna jest wyłącznie linia sensora.</div>
+    </section>
 
-<!-- ===================================================================== -->
-<!-- WYKRESY POMOCNICZE 2D                                                   -->
-<!-- ===================================================================== -->
-<section class="main-grid">
-  <section class="card chart-card">
-    <div class="chart-head"><div><div class="chart-title">Histogram temperatury sensora</div><div class="chart-subtitle">Rozkład wartości dla tego samego okresu</div></div></div>
-    <div class="plot-frame"><div id="histChart"></div></div>
-  </section>
-  <section class="card chart-card">
-    <div class="chart-head"><div><div class="chart-title">Meteo Lublin</div><div class="chart-subtitle">RH, AH, punkt rosy i ciśnienie</div></div></div>
-    <div class="plot-frame"><div id="meteoChart"></div></div>
-  </section>
-</section>
+    <!-- KAFELKI PODSUMOWANIA -->
+    <section class="summary-grid">
+      <div class="card metric-card"><div class="metric-label">Sensor teraz</div><div id="currentTemp" class="metric-value">--.-- °C</div><div id="lastTime" class="metric-note">Ostatni punkt: —</div></div>
+      <div class="card metric-card"><div class="metric-label">Lublin teraz</div><div id="outsideTemp" class="metric-value">--.-- °C</div><div id="outsideInfo" class="metric-note">Dane zewnętrzne: —</div></div>
+      <div class="card metric-card"><div class="metric-label">Punkt rosy</div><div id="outsideDewPoint" class="metric-value">--.-- °C</div><div class="metric-note">Wyliczony z temperatury i RH</div></div>
+      <div class="card metric-card"><div class="metric-label">Wilgotność względna</div><div id="outsideRH" class="metric-value">--.-- %</div><div class="metric-note">Dane pogodowe dla Lublina</div></div>
+      <div class="card metric-card"><div class="metric-label">Wilgotność bezwzględna</div><div id="outsideAH" class="metric-value">--.-- g/m³</div><div class="metric-note">Wyliczona z temperatury i RH</div></div>
+      <div class="card metric-card"><div class="metric-label">Ciśnienie</div><div id="outsidePressure" class="metric-value">--.-- hPa</div><div class="metric-note">Ciśnienie zredukowane do poziomu morza</div></div>
+      <div class="card metric-card"><div class="metric-label">Wschód słońca</div><div id="sunriseValue" class="metric-value">--:--</div><div class="metric-note">Lublin, czas lokalny Polski</div></div>
+      <div class="card metric-card"><div class="metric-label">Zachód słońca</div><div id="sunsetValue" class="metric-value">--:--</div><div class="metric-note">Lublin, czas lokalny Polski</div></div>
+      <div class="card metric-card"><div class="metric-label">Ocena warunków</div><div id="comfortValue" class="metric-value">Brak danych</div><div id="comfortSub" class="metric-note">Panel pokaże orientacyjną ocenę po pobraniu danych.</div></div>
+      <div class="card metric-card"><div class="metric-label">Liczba punktów</div><div id="pointCountsSummary" class="metric-value">S: -- | L: --</div><div class="metric-note">S = sensor, L = Lublin</div></div>
+    </section>
 
-<section class="main-grid">
-  <section class="card chart-card">
-    <div class="chart-head"><div><div class="chart-title">Overlay dni: sensor + Lublin</div><div class="chart-subtitle">Porównanie przebiegów dobowych</div></div><div class="overlay-controls"><label for="overlayDaysSelect">Liczba dni:</label><select id="overlayDaysSelect" class="select"><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option><option value="7">7</option></select></div></div>
-    <div class="plot-frame"><div id="overlayChart"></div></div>
-  </section>
-  <section class="card chart-card">
-    <div class="chart-head"><div><div class="chart-title">Wykres Moliera 2D</div><div class="chart-subtitle">Aktualny punkt meteo dla Lublina</div></div></div>
-    <div class="plot-frame"><div id="mollierChart"></div></div>
-  </section>
-</section>
+    <!-- GŁÓWNY WYKRES 2D + PANEL ANALITYCZNY -->
+    <section class="main-grid">
+      <section class="card chart-card">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title">Temperatura: sensor + Lublin + model</div>
+            <div class="chart-subtitle">Linia modelu Lublina od początku zakresu aż w przyszłość</div>
+          </div>
+        </div>
+        <div class="plot-frame"><div id="mainChart"></div></div>
+      </section>
 
-<!-- ===================================================================== -->
-<!-- MOLIER 3D                                                               -->
-<!-- ===================================================================== -->
-<section class="card chart-card">
-  <div class="chart-head">
-    <div>
-      <div class="chart-title">Wykres Moliera 3D</div>
-      <div class="chart-subtitle">X = temperatura sucha, Y = czas, Z = entalpia, powierzchnie RH + trajektoria danych</div>
-    </div>
+      <section class="card side-card">
+        <div class="stack">
+          <div class="analysis-box"><div class="analysis-title">Sensor: minimum</div><div id="sensorMin" class="analysis-value">--</div><div class="analysis-sub">Najniższa wartość sensora w zakresie</div></div>
+          <div class="analysis-box"><div class="analysis-title">Lublin: minimum</div><div id="lublinMin" class="analysis-value">--</div><div class="analysis-sub">Najniższa temperatura zewnętrzna w zakresie</div></div>
+          <div class="analysis-box"><div class="analysis-title">Sensor: maksimum</div><div id="sensorMax" class="analysis-value">--</div><div class="analysis-sub">Najwyższa wartość sensora w zakresie</div></div>
+          <div class="analysis-box"><div class="analysis-title">Lublin: maksimum</div><div id="lublinMax" class="analysis-value">--</div><div class="analysis-sub">Najwyższa temperatura zewnętrzna w zakresie</div></div>
+          <div class="analysis-box"><div class="analysis-title">Sensor: średnia / amplituda</div><div id="sensorAvg" class="analysis-value">--</div><div id="sensorAmplitude" class="analysis-sub">--</div></div>
+          <div class="analysis-box"><div class="analysis-title">Lublin: średnia / amplituda</div><div id="lublinAvg" class="analysis-value">--</div><div id="lublinAmplitude" class="analysis-sub">--</div></div>
+          <div class="analysis-box"><div class="analysis-title">Sensor: trend</div><div id="sensorTrend" class="analysis-value">--</div><div id="sensorTrendNote" class="analysis-sub">Brak danych.</div></div>
+          <div class="analysis-box"><div class="analysis-title">Lublin: trend</div><div id="lublinTrend" class="analysis-value">--</div><div id="lublinTrendNote" class="analysis-sub">Brak danych.</div></div>
+          <div class="analysis-box"><div class="analysis-title">Punkty sensora</div><div id="sensorPointCount" class="analysis-value">--</div><div class="analysis-sub">Punkty po przetworzeniu do wykresu</div></div>
+          <div class="analysis-box"><div class="analysis-title">Punkty Lublina</div><div id="lublinPointCount" class="analysis-value">--</div><div class="analysis-sub">Punkty historyczne meteo w zakresie</div></div>
+        </div>
+      </section>
+    </section>
+
+    <!-- WYKRESY POMOCNICZE 2D -->
+    <section class="main-grid">
+      <section class="card chart-card">
+        <div class="chart-head"><div><div class="chart-title">Histogram temperatury sensora</div><div class="chart-subtitle">Rozkład wartości dla tego samego okresu</div></div></div>
+        <div class="plot-frame"><div id="histChart"></div></div>
+      </section>
+      <section class="card chart-card">
+        <div class="chart-head"><div><div class="chart-title">Meteo Lublin</div><div class="chart-subtitle">RH, AH, punkt rosy i ciśnienie</div></div></div>
+        <div class="plot-frame"><div id="meteoChart"></div></div>
+      </section>
+    </section>
+
+    <section class="main-grid">
+      <section class="card chart-card">
+        <div class="chart-head">
+          <div><div class="chart-title">Overlay dni: sensor + Lublin</div><div class="chart-subtitle">Porównanie przebiegów dobowych</div></div>
+          <div class="overlay-controls">
+            <label for="overlayDaysSlider">Liczba dni:</label>
+            <input id="overlayDaysSlider" class="range-slider" type="range" min="1" max="7" step="1" value="7" style="width: 220px;" />
+            <div id="overlayDaysValue" class="status">7 dni</div>
+          </div>
+        </div>
+        <div class="plot-frame"><div id="overlayChart"></div></div>
+      </section>
+      <section class="card chart-card">
+        <div class="chart-head"><div><div class="chart-title">Wykres Moliera 2D</div><div class="chart-subtitle">Aktualny punkt meteo dla Lublina</div></div></div>
+        <div class="plot-frame"><div id="mollierChart"></div></div>
+      </section>
+    </section>
+
+    <!-- MOLIER 3D -->
+    <section class="card chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">Wykres Moliera 3D</div>
+          <div class="chart-subtitle">X = temperatura sucha, Y = czas, Z = entalpia, powierzchnie RH + trajektoria danych</div>
+        </div>
+      </div>
+      <div class="plot-frame"><div id="mollier3dChart"></div></div>
+      <div id="mollier3dInfo" class="info-line">Oczekiwanie na dane...</div>
+    </section>
+
+    <!-- PEŁNY OVERLAY 3D SENSORA -->
+    <section class="card chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">Sensor overlay 3D – pełny zbiór danych</div>
+          <div class="chart-subtitle">Osobny zbiór danych z sensora, wygładzenie linii, domyślnie 7 dni</div>
+        </div>
+        <div class="overlay-controls">
+          <label for="sensorOverlay3dFullDaysSlider">Liczba dni:</label>
+          <input id="sensorOverlay3dFullDaysSlider" class="range-slider" type="range" min="1" max="7" step="1" value="7" style="width: 220px;" />
+          <div id="sensorOverlay3dFullDaysValue" class="status">7 dni</div>
+          <label for="sensorOverlay3dFullProjection" style="margin-left: 8px;">Projekcja:</label>
+          <select id="sensorOverlay3dFullProjection" class="select">
+            <option value="perspective" selected>Perspektywiczna</option>
+            <option value="orthographic">Nieperspektywiczna</option>
+          </select>
+        </div>
+      </div>
+      <div class="plot-frame"><div id="sensorOverlay3dFullChart"></div></div>
+      <div id="sensorOverlay3dFullInfo" class="info-line">Oczekiwanie na dane...</div>
+    </section>
+
+    <!-- OVERLAY 3D METEO Z BIEŻĄCEGO ZAKRESU -->
+    <section class="card chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">Meteo overlay 3D</div>
+          <div class="chart-subtitle">Temperatura z meteo, nakładka dobowa w 3D: X = dzień, Y = godzina, Z = temperatura</div>
+        </div>
+        <div class="overlay-controls">
+          <label for="meteoOverlay3dDaysSlider">Liczba dni:</label>
+          <input id="meteoOverlay3dDaysSlider" class="range-slider" type="range" min="1" max="1" step="1" value="1" style="width: 220px;" />
+          <div id="meteoOverlay3dDaysValue" class="status">1 dzień</div>
+          <label for="meteoOverlay3dProjection" style="margin-left: 8px;">Projekcja:</label>
+          <select id="meteoOverlay3dProjection" class="select">
+            <option value="perspective" selected>Perspektywiczna</option>
+            <option value="orthographic">Nieperspektywiczna</option>
+          </select>
+        </div>
+      </div>
+      <div class="plot-frame"><div id="meteoOverlay3dChart"></div></div>
+      <div id="meteoOverlay3dInfo" class="info-line">Oczekiwanie na dane...</div>
+    </section>
+
+    <!-- EKSPORT -->
+    <section class="card chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">Eksport danych</div>
+          <div class="chart-subtitle">Możesz pobrać bieżący zakres albo pełny zbiór sensora</div>
+        </div>
+        <div class="overlay-controls">
+          <label for="exportDatasetSelect">Zbiór:</label>
+          <select id="exportDatasetSelect" class="select">
+            <option value="current_sensor" selected>Bieżący zakres sensora</option>
+            <option value="full_sensor">Pełny zbiór sensora</option>
+            <option value="current_combo">Bieżący zakres sensora + Lublin</option>
+          </select>
+          <label for="exportFormatSelect">Format:</label>
+          <select id="exportFormatSelect" class="select">
+            <option value="csv" selected>CSV</option>
+            <option value="xlsx">XLSX</option>
+          </select>
+        </div>
+      </div>
+      <div style="padding: 8px 6px 12px 6px;"><button id="exportButton" class="btn btn-big">Pobierz dane</button></div>
+      <div id="exportInfo" class="info-line">Eksport używa ostatnio pobranych danych. XLSX działa dzięki bibliotece SheetJS.</div>
+    </section>
   </div>
-  <div class="plot-frame"><div id="mollier3dChart"></div></div>
-  <div id="mollier3dInfo" class="info-line">Oczekiwanie na dane...</div>
-</section>
 
-<!-- ===================================================================== -->
-<!-- PEŁNY OVERLAY 3D SENSORA                                                -->
-<!-- ===================================================================== -->
-<section class="card chart-card">
-  <div class="chart-head">
-    <div>
-      <div class="chart-title">Sensor overlay 3D – pełny zbiór danych</div>
-      <div class="chart-subtitle">Osobny zbiór danych z sensora, wygładzenie linii, domyślnie 7 dni</div>
-    </div>
-    <div class="overlay-controls">
-      <label for="sensorOverlay3dFullDaysSlider">Liczba dni:</label>
-      <input id="sensorOverlay3dFullDaysSlider" class="range-slider" type="range" min="1" max="7" step="1" value="7" style="width: 220px;" />
-      <div id="sensorOverlay3dFullDaysValue" class="status">7 dni</div>
-
-      <label for="sensorOverlay3dProjection" style="margin-left: 8px;">Projekcja:</label>
-      <select id="sensorOverlay3dProjection" class="select">
-        <option value="perspective" selected>Perspektywiczna</option>
-        <option value="orthographic">Nieperspektywiczna</option>
-      </select>
-    </div>
-  </div>
-  <div class="plot-frame"><div id="sensorOverlay3dFullChart"></div></div>
-  <div id="sensorOverlay3dFullInfo" class="info-line">Oczekiwanie na dane...</div>
-</section>
-
-<!-- ===================================================================== -->
-<!-- EKSPORT                                                                 -->
-<!-- ===================================================================== -->
-<section class="card chart-card">
-  <div class="chart-head">
-    <div>
-      <div class="chart-title">Eksport danych</div>
-      <div class="chart-subtitle">Możesz pobrać bieżący zakres albo pełny zbiór sensora</div>
-    </div>
-    <div class="overlay-controls">
-      <label for="exportDatasetSelect">Zbiór:</label>
-      <select id="exportDatasetSelect" class="select">
-        <option value="current_sensor" selected>Bieżący zakres sensora</option>
-        <option value="full_sensor">Pełny zbiór sensora</option>
-        <option value="current_combo">Bieżący zakres sensora + Lublin</option>
-      </select>
-      <label for="exportFormatSelect">Format:</label>
-      <select id="exportFormatSelect" class="select">
-        <option value="csv" selected>CSV</option>
-        <option value="xlsx">XLSX</option>
-      </select>
-    </div>
-  </div>
-  <div style="padding: 8px 6px 12px 6px;">
-    <button id="exportButton" class="btn btn-big">Pobierz dane</button>
-  </div>
-  <div id="exportInfo" class="info-line">Eksport używa ostatnio pobranych danych. XLSX działa dzięki bibliotece SheetJS.</div>
-</section>
-
-  </div>  <script>
+  <script>
     // =======================================================================
     // KONFIGURACJA GŁÓWNA
     // =======================================================================
@@ -657,16 +651,33 @@ Założenia i interpretacja działania:
     let refreshTimer = null;
     let lublinGeo = null;
     let chartUiRevision = 0;
+
     let sensor3dOverlayDays = 3;
     let sensorAvailableDaysMax = 1;
     let sensorOldestTimestampCache = null;
     let sensor3dOverlayAutoMaxPending = true;
+    let sensor3dProjectionMode = "perspective";
+    let sensor3dShowDots = true;
 
-    // Stan dla dolnego, pełnego overlay 3D.
+    let meteo3dOverlayDays = 3;
+    let meteoAvailableDaysMax = 1;
+    let meteo3dOverlayAutoMaxPending = true;
+    let meteo3dProjectionMode = "perspective";
+
+    let overlayCompareDays = 7;
+    let overlayCompareDaysMax = 7;
+
     let sensor3dFullOverlayDays = 7;
     let sensorFullAvailableDaysMax = 7;
+    let sensor3dFullProjectionMode = "perspective";
     let fullSensorCacheData = null;
     let fullSensorCacheTs = 0;
+
+    // Dane przygotowane do rysowania overlayów 3D.
+    // Dzięki temu zmiana projekcji i kropek nie wymaga ponownego pobierania.
+    let currentSensorPrepared3D = null;
+    let currentMeteoPrepared3D = null;
+    let fullSensorPrepared3D = null;
 
     // Ostatnio pobrane dane – potrzebne do eksportu bez ponownego pobierania.
     let lastCurrentSensorData = { x: [], y: [] };
@@ -681,7 +692,8 @@ Założenia i interpretacja działania:
     const refreshBtnEl = document.getElementById("refreshBtn");
     const hoursSliderEl = document.getElementById("hoursSlider");
     const sliderHoursValueEl = document.getElementById("sliderHoursValue");
-    const overlayDaysSelectEl = document.getElementById("overlayDaysSelect");
+    const overlayDaysSliderEl = document.getElementById("overlayDaysSlider");
+    const overlayDaysValueEl = document.getElementById("overlayDaysValue");
     const startDateEl = document.getElementById("startDate");
     const endDateEl = document.getElementById("endDate");
     const applyRangeBtnEl = document.getElementById("applyRangeBtn");
@@ -700,13 +712,23 @@ Założenia i interpretacja działania:
     const comfortSubEl = document.getElementById("comfortSub");
     const pointCountsSummaryEl = document.getElementById("pointCountsSummary");
     const mollier3dInfoEl = document.getElementById("mollier3dInfo");
+
     const sensorOverlay3dDaysSliderEl = document.getElementById("sensorOverlay3dDaysSlider");
     const sensorOverlay3dDaysValueEl = document.getElementById("sensorOverlay3dDaysValue");
+    const sensorOverlay3dProjectionEl = document.getElementById("sensorOverlay3dProjection");
+    const sensorOverlay3dDotsToggleEl = document.getElementById("sensorOverlay3dDotsToggle");
     const sensorOverlay3dInfoEl = document.getElementById("sensorOverlay3dInfo");
+
     const sensorOverlay3dFullDaysSliderEl = document.getElementById("sensorOverlay3dFullDaysSlider");
     const sensorOverlay3dFullDaysValueEl = document.getElementById("sensorOverlay3dFullDaysValue");
-    const sensorOverlay3dProjectionEl = document.getElementById("sensorOverlay3dProjection");
+    const sensorOverlay3dFullProjectionEl = document.getElementById("sensorOverlay3dFullProjection");
     const sensorOverlay3dFullInfoEl = document.getElementById("sensorOverlay3dFullInfo");
+
+    const meteoOverlay3dDaysSliderEl = document.getElementById("meteoOverlay3dDaysSlider");
+    const meteoOverlay3dDaysValueEl = document.getElementById("meteoOverlay3dDaysValue");
+    const meteoOverlay3dProjectionEl = document.getElementById("meteoOverlay3dProjection");
+    const meteoOverlay3dInfoEl = document.getElementById("meteoOverlay3dInfo");
+
     const exportDatasetSelectEl = document.getElementById("exportDatasetSelect");
     const exportFormatSelectEl = document.getElementById("exportFormatSelect");
     const exportButtonEl = document.getElementById("exportButton");
@@ -714,6 +736,7 @@ Założenia i interpretacja działania:
     const progressFillEl = document.getElementById("progressFill");
     const progressTextEl = document.getElementById("progressText");
     const progressTimesEl = document.getElementById("progressTimes");
+    const progressCountsEl = document.getElementById("progressCounts");
 
     const analysisIds = {
       sensor: {
@@ -794,6 +817,12 @@ Założenia i interpretacja działania:
 
     function setProgressTimes(fetchMs, overlayMs) {
       progressTimesEl.textContent = `Pobieranie: ${formatDurationMs(fetchMs)} | Overlay 3D: ${formatDurationMs(overlayMs)}`;
+    }
+
+    function setProgressCounts(sensorCount, meteoCount) {
+      const sensorText = Number.isFinite(sensorCount) ? sensorCount : "—";
+      const meteoText = Number.isFinite(meteoCount) ? meteoCount : "—";
+      progressCountsEl.textContent = `Próbki: sensor ${sensorText} | meteo ${meteoText}`;
     }
 
     function getActiveRange() {
@@ -916,11 +945,8 @@ Założenia i interpretacja działania:
       const totalChunks = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / chunkMs));
       let completedChunks = 0;
 
-      if (progressCallback) {
-        progressCallback(completedChunks, totalChunks);
-      }
+      if (progressCallback) progressCallback(completedChunks, totalChunks, "fetch", 0);
 
-      // Pobieranie partiami dobowymi, żeby nie przekroczyć limitu API.
       while (chunkStart < endDate) {
         const chunkEnd = new Date(Math.min(chunkStart.getTime() + chunkMs, endDate.getTime()));
         let url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/fields/${FIELD}.json?start=${encodeURIComponent(formatThingSpeakDateUTC(chunkStart))}&end=${encodeURIComponent(formatThingSpeakDateUTC(chunkEnd))}&results=8000`;
@@ -939,16 +965,17 @@ Założenia i interpretacja działania:
         }
 
         completedChunks++;
-        if (progressCallback) {
-          progressCallback(completedChunks, totalChunks);
-        }
-
+        if (progressCallback) progressCallback(completedChunks, totalChunks, "fetch", allY.length);
         chunkStart = new Date(chunkEnd.getTime() + 1000);
       }
 
+      if (progressCallback) progressCallback(totalChunks, totalChunks, "processing", allY.length);
       const deduped = deduplicateByTime(allX, allY);
       const filtered = filterByRange(deduped.x, deduped.y, startDate, endDate);
-      return downsample(filtered.x, filtered.y, maxPoints);
+      if (progressCallback) progressCallback(totalChunks, totalChunks, "finalizing", filtered.y.length);
+      const result = downsample(filtered.x, filtered.y, maxPoints);
+      if (progressCallback) progressCallback(totalChunks, totalChunks, "done", result.y.length);
+      return result;
     }
 
     async function fetchSensorOldestTimestampApprox() {
@@ -975,15 +1002,18 @@ Założenia i interpretacja działania:
       const nowMs = Date.now();
       const cacheIsFresh = fullSensorCacheData && (nowMs - fullSensorCacheTs < 5 * 60 * 1000);
       if (!force && cacheIsFresh) {
-        if (progressCallback) {
-          progressCallback(1, 1, true);
-        }
+        if (progressCallback) progressCallback(1, 1, true, "done", fullSensorCacheData?.y?.length ?? 0);
         return fullSensorCacheData;
       }
 
-      const oldest = await fetchSensorOldestTimestampApprox();
+      const defaultStart = new Date(DEFAULT_START_DATE_STR);
       const now = new Date();
-      const data = await fetchThingSpeakRange(oldest, now, FULL_SENSOR_MAX_POINTS, progressCallback ? (done, total) => progressCallback(done, total, false) : null);
+      const data = await fetchThingSpeakRange(
+        defaultStart,
+        now,
+        FULL_SENSOR_MAX_POINTS,
+        progressCallback ? (done, total, phase, count) => progressCallback(done, total, false, phase, count) : null
+      );
 
       fullSensorCacheData = data;
       fullSensorCacheTs = nowMs;
@@ -991,9 +1021,7 @@ Założenia i interpretacja działania:
     }
 
     function updateSensorOverlayAvailabilityFromData(sensorData) {
-      const uniqueDays = new Set(
-        sensorData.x.map(d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`)
-      );
+      const uniqueDays = new Set(sensorData.x.map(d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`));
       sensorAvailableDaysMax = Math.max(1, uniqueDays.size);
 
       if (sensor3dOverlayAutoMaxPending) {
@@ -1010,15 +1038,41 @@ Założenia i interpretacja działania:
     }
 
     function updateFullSensorOverlayAvailability(fullSensorData) {
-      const uniqueDays = new Set(
-        fullSensorData.x.map(d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`)
-      );
+      const uniqueDays = new Set(fullSensorData.x.map(d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`));
       sensorFullAvailableDaysMax = Math.max(1, uniqueDays.size);
       if (sensor3dFullOverlayDays > sensorFullAvailableDaysMax) sensor3dFullOverlayDays = sensorFullAvailableDaysMax;
       if (sensor3dFullOverlayDays < 1) sensor3dFullOverlayDays = 1;
       sensorOverlay3dFullDaysSliderEl.max = String(sensorFullAvailableDaysMax);
       sensorOverlay3dFullDaysSliderEl.value = String(sensor3dFullOverlayDays);
       sensorOverlay3dFullDaysValueEl.textContent = `${formatDaysText(sensor3dFullOverlayDays)} / max ${sensorFullAvailableDaysMax}`;
+    }
+
+    function updateMeteoOverlayAvailabilityFromData(lublinHistory) {
+      const uniqueDays = new Set(lublinHistory.x.map(d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`));
+      meteoAvailableDaysMax = Math.max(1, uniqueDays.size);
+
+      if (meteo3dOverlayAutoMaxPending) {
+        meteo3dOverlayDays = meteoAvailableDaysMax;
+        meteo3dOverlayAutoMaxPending = false;
+      } else {
+        if (meteo3dOverlayDays > meteoAvailableDaysMax) meteo3dOverlayDays = meteoAvailableDaysMax;
+        if (meteo3dOverlayDays < 1) meteo3dOverlayDays = 1;
+      }
+
+      meteoOverlay3dDaysSliderEl.max = String(meteoAvailableDaysMax);
+      meteoOverlay3dDaysSliderEl.value = String(meteo3dOverlayDays);
+      meteoOverlay3dDaysValueEl.textContent = `${formatDaysText(meteo3dOverlayDays)} / max ${meteoAvailableDaysMax}`;
+    }
+
+    function updateOverlayCompareAvailability(sensorData, lublinHistory) {
+      const sensorDays = new Set(sensorData.x.map(d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`)).size;
+      const lublinDays = new Set(lublinHistory.x.map(d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`)).size;
+      overlayCompareDaysMax = Math.max(1, Math.max(sensorDays, lublinDays));
+      if (overlayCompareDays > overlayCompareDaysMax) overlayCompareDays = overlayCompareDaysMax;
+      if (overlayCompareDays < 1) overlayCompareDays = 1;
+      overlayDaysSliderEl.max = String(overlayCompareDaysMax);
+      overlayDaysSliderEl.value = String(overlayCompareDays);
+      overlayDaysValueEl.textContent = `${formatDaysText(overlayCompareDays)} / max ${overlayCompareDaysMax}`;
     }
 
     // =======================================================================
@@ -1076,7 +1130,6 @@ Założenia i interpretacja działania:
 
       const startMs = startDate.getTime();
       const endMs = endDate.getTime();
-
       for (let i = 0; i < times.length; i++) {
         const ms = times[i].getTime();
         if (ms >= startMs && ms <= endMs) {
@@ -1244,13 +1297,11 @@ Założenia i interpretacja działania:
         for (let i = 0; i < count; i++) {
           const y = ys[i];
           if (!Number.isFinite(y)) continue;
-
           if (xWindow) {
             const xMs = new Date(xs[i]).getTime();
             if (!Number.isFinite(xMs)) continue;
             if (xMs < xWindow[0] || xMs > xWindow[1]) continue;
           }
-
           out.push(y);
         }
       });
@@ -1405,7 +1456,7 @@ Założenia i interpretacja działania:
     }
 
     function renderOverlayDaysChart(sensorData, lublinHistory) {
-      const daysToShow = parseInt(overlayDaysSelectEl.value, 10);
+      const daysToShow = overlayCompareDays;
       const traces = [];
       const palette = ["#4f8cff", "#22c55e", "#f59e0b", "#f472b6", "#38bdf8", "#a78bfa", "#ef4444"];
 
@@ -1435,6 +1486,7 @@ Założenia i interpretacja działania:
 
       const merged = [...sensorData.y, ...lublinHistory.temp].filter(v => Number.isFinite(v));
       const yRange = merged.length ? computePaddedYRange(merged) : undefined;
+      const xTicks = Array.from({ length: 25 }, (_, i) => i);
 
       const layout = {
         margin: { l: 56, r: 18, t: 12, b: 70 },
@@ -1448,8 +1500,8 @@ Założenia i interpretacja działania:
           title: "Godzina doby",
           gridcolor: "#243146",
           tickmode: "array",
-          tickvals: [0, 3, 6, 9, 12, 15, 18, 21, 24],
-          ticktext: ["0", "3", "6", "9", "12", "15", "18", "21", "24"],
+          tickvals: xTicks,
+          ticktext: xTicks.map(v => String(v)),
           fixedrange: false,
           rangeslider: buildRangeSliderConfig()
         },
@@ -1528,7 +1580,6 @@ Założenia i interpretacja działania:
       const xMatrix = [];
       const yMatrix = [];
       const zMatrix = [];
-
       for (let i = 0; i < timeValues.length; i++) {
         const rowX = [];
         const rowY = [];
@@ -1653,79 +1704,102 @@ Założenia i interpretacja działania:
     }
 
     // =======================================================================
-    // OVERLAY 3D SENSORA
+    // PRZYGOTOWANIE I RYSOWANIE OVERLAYÓW 3D
     // =======================================================================
-    function groupSensorByDay(sensorData) {
+    function smoothNumericSeries(values, windowRadius = 1) {
+      if (!Array.isArray(values) || values.length === 0 || windowRadius <= 0) return values;
+      const result = [];
+      for (let i = 0; i < values.length; i++) {
+        let sum = 0;
+        let count = 0;
+        for (let j = i - windowRadius; j <= i + windowRadius; j++) {
+          if (j >= 0 && j < values.length && Number.isFinite(values[j])) {
+            sum += values[j];
+            count++;
+          }
+        }
+        result.push(count > 0 ? sum / count : values[i]);
+      }
+      return result;
+    }
+
+    function prepareOverlay3DData(seriesData, seriesLabel = "Sensor") {
       const grouped = new Map();
-      for (let i = 0; i < sensorData.x.length; i++) {
-        const d = sensorData.x[i];
+      for (let i = 0; i < seriesData.x.length; i++) {
+        const d = seriesData.x[i];
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         if (!grouped.has(key)) grouped.set(key, []);
         grouped.get(key).push({
           hour: d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600,
-          temp: sensorData.y[i],
+          value: seriesData.y[i],
           date: d
         });
       }
-      return grouped;
+      return {
+        grouped,
+        dayKeys: Array.from(grouped.keys()).sort(),
+        pointCount: seriesData.y.length,
+        seriesLabel
+      };
     }
 
-    /*
-      Delikatne wygładzanie:
-      - nie zmieniamy geometrii agresywnie,
-      - nie rysujemy markerów,
-      - używamy shape = spline i lekkiego wygładzenia.
-      To daje profesjonalniejszy efekt niż gęste punkty, ale nie powinno zniekształcać przebiegu tak mocno,
-      jak silne wygładzanie filtrami.
-    */
-    function buildSensor3DTraces(dayKeys, grouped, useSpline, projectionMode) {
+    function buildOverlay3DTraces(prepared, selectedDays, options = {}) {
       const traces = [];
       const palette = ["#4f8cff", "#22c55e", "#f59e0b", "#f472b6", "#38bdf8", "#a78bfa", "#ef4444", "#10b981", "#fb7185", "#eab308"];
       const xTickvals = [];
       const xTicktext = [];
       const allTemps = [];
+      const dayKeys = prepared.dayKeys.slice(-selectedDays);
 
       dayKeys.forEach((key, idx) => {
-        const points = grouped.get(key).sort((a, b) => a.hour - b.hour);
+        const points = prepared.grouped.get(key).slice().sort((a, b) => a.hour - b.hour);
         xTickvals.push(idx);
         xTicktext.push(key);
-        allTemps.push(...points.map(p => p.temp).filter(v => Number.isFinite(v)));
+
+        const rawTemps = points.map(p => p.value).filter(v => Number.isFinite(v));
+        allTemps.push(...rawTemps);
+        const zTemps = options.useSmoothing ? smoothNumericSeries(points.map(p => p.value), 1) : points.map(p => p.value);
 
         traces.push({
           type: "scatter3d",
-          mode: useSpline ? "lines" : "lines+markers",
+          mode: options.showMarkers ? "lines+markers" : "lines",
           name: key,
           x: points.map(() => idx),
           y: points.map(p => p.hour),
-          z: points.map(p => p.temp),
-          customdata: points.map(p => [key, p.date.toLocaleTimeString("pl-PL"), p.temp]),
+          z: zTemps,
+          customdata: points.map((p, i) => [key, p.date.toLocaleTimeString("pl-PL"), p.value, zTemps[i]]),
           line: {
-            width: 5,
-            color: palette[idx % palette.length],
-            shape: useSpline ? "spline" : "linear",
-            smoothing: useSpline ? 0.45 : 0
+            width: options.useSmoothing ? 4.5 : 5,
+            color: palette[idx % palette.length]
           },
-          marker: useSpline ? undefined : { size: 3.2, color: palette[idx % palette.length] },
-          hovertemplate: "Dzień: %{customdata[0]}<br>Godzina: %{customdata[1]}<br>Temperatura: %{customdata[2]:.2f} °C<extra>Sensor</extra>"
+          marker: options.showMarkers ? { size: 3.2, color: palette[idx % palette.length] } : undefined,
+          hovertemplate: `${prepared.seriesLabel}: %{customdata[2]:.2f} °C<br>Dzień: %{customdata[0]}<br>Godzina: %{customdata[1]}<br>Wartość na linii: %{customdata[3]:.2f} °C<extra>${prepared.seriesLabel}</extra>`
         });
       });
 
-      return { traces, xTickvals, xTicktext, zRange: computePaddedYRange(allTemps) || [0, 1], projectionMode };
+      return {
+        traces,
+        xTickvals,
+        xTicktext,
+        zRange: computePaddedYRange(allTemps) || [0, 1],
+        dayKeys,
+        pointCount: prepared.pointCount
+      };
     }
 
-    function renderSensorOverlay3D(chartId, infoEl, sensorData, selectedDays, options = {}) {
+    function renderOverlay3DPrepared(chartId, infoEl, prepared, selectedDays, options = {}) {
       const renderStart = performance.now();
 
-      if (!sensorData.x.length || !sensorData.y.length) {
+      if (!prepared || !prepared.dayKeys.length) {
         Plotly.react(chartId, [], {}, getCommonPlotConfig());
-        infoEl.textContent = "Brak danych sensora do overlay 3D.";
+        infoEl.textContent = "Brak danych do overlay 3D.";
         return Promise.resolve(0);
       }
 
-      const grouped = groupSensorByDay(sensorData);
-      const allDayKeys = Array.from(grouped.keys()).sort();
-      const dayKeys = allDayKeys.slice(-selectedDays);
-      const build = buildSensor3DTraces(dayKeys, grouped, !!options.useSpline, options.projectionMode || "perspective");
+      const build = buildOverlay3DTraces(prepared, selectedDays, options);
+      const hourTickVals = Array.from({ length: 25 }, (_, i) => i);
+      const hourTickText = hourTickVals.map(v => String(v));
+      const zTick0 = Math.floor(build.zRange[0]);
 
       const layout = {
         margin: { l: 0, r: 0, t: 6, b: 0 },
@@ -1749,13 +1823,16 @@ Założenia i interpretacja działania:
             tickmode: "array",
             tickvals: build.xTickvals,
             ticktext: build.xTicktext,
-            range: [-0.5, Math.max(dayKeys.length - 0.5, 0.5)]
+            range: [-0.5, Math.max(build.dayKeys.length - 0.5, 0.5)]
           },
           yaxis: {
             title: "Godzina doby",
             gridcolor: "#243146",
             zerolinecolor: "#243146",
             backgroundcolor: "rgba(0,0,0,0)",
+            tickmode: "array",
+            tickvals: hourTickVals,
+            ticktext: hourTickText,
             range: [0, 24]
           },
           zaxis: {
@@ -1763,7 +1840,9 @@ Założenia i interpretacja działania:
             gridcolor: "#243146",
             zerolinecolor: "#243146",
             backgroundcolor: "rgba(0,0,0,0)",
-            range: build.zRange
+            range: build.zRange,
+            tick0: zTick0,
+            dtick: 1
           }
         },
         showlegend: true
@@ -1771,8 +1850,32 @@ Założenia i interpretacja działania:
 
       return Promise.resolve(Plotly.react(chartId, build.traces, layout, getCommonPlotConfig())).then(() => {
         const renderMs = performance.now() - renderStart;
-        infoEl.textContent = `Overlay 3D sensora | dni na wykresie: ${dayKeys.length} | punktów: ${sensorData.y.length} | projekcja: ${options.projectionMode || "perspective"}${options.useSpline ? " | wygładzenie: spline" : " | wygładzenie: brak"} | odświeżenie: ${formatDurationMs(renderMs)}`;
+        infoEl.textContent = `${prepared.seriesLabel} overlay 3D | dni na wykresie: ${build.dayKeys.length} | punktów: ${build.pointCount} | projekcja: ${options.projectionMode || "perspective"}${options.useSmoothing ? " | wygładzenie: tak" : " | wygładzenie: nie"}${options.showMarkers ? " | kropki: tak" : " | kropki: nie"} | odświeżenie: ${formatDurationMs(renderMs)}`;
         return renderMs;
+      });
+    }
+
+    function rerenderCurrentSensorOverlay3D() {
+      return renderOverlay3DPrepared("sensorOverlay3dChart", sensorOverlay3dInfoEl, currentSensorPrepared3D, sensor3dOverlayDays, {
+        useSmoothing: false,
+        projectionMode: sensor3dProjectionMode,
+        showMarkers: sensor3dShowDots
+      });
+    }
+
+    function rerenderFullSensorOverlay3D() {
+      return renderOverlay3DPrepared("sensorOverlay3dFullChart", sensorOverlay3dFullInfoEl, fullSensorPrepared3D, sensor3dFullOverlayDays, {
+        useSmoothing: true,
+        projectionMode: sensor3dFullProjectionMode,
+        showMarkers: false
+      });
+    }
+
+    function rerenderCurrentMeteoOverlay3D() {
+      return renderOverlay3DPrepared("meteoOverlay3dChart", meteoOverlay3dInfoEl, currentMeteoPrepared3D, meteo3dOverlayDays, {
+        useSmoothing: false,
+        projectionMode: meteo3dProjectionMode,
+        showMarkers: false
       });
     }
 
@@ -1781,32 +1884,18 @@ Założenia i interpretacja działania:
     // =======================================================================
     function buildExportRows(datasetKey) {
       if (datasetKey === "current_sensor") {
-        return lastCurrentSensorData.x.map((d, i) => ({
-          czas: d.toISOString(),
-          temperatura_sensor_C: lastCurrentSensorData.y[i]
-        }));
+        return lastCurrentSensorData.x.map((d, i) => ({ czas: d.toISOString(), temperatura_sensor_C: lastCurrentSensorData.y[i] }));
       }
 
       if (datasetKey === "full_sensor") {
         const data = fullSensorCacheData || { x: [], y: [] };
-        return data.x.map((d, i) => ({
-          czas: d.toISOString(),
-          temperatura_sensor_C: data.y[i]
-        }));
+        return data.x.map((d, i) => ({ czas: d.toISOString(), temperatura_sensor_C: data.y[i] }));
       }
 
       if (datasetKey === "current_combo") {
         const rows = [];
-        lastCurrentSensorData.x.forEach((d, i) => rows.push({
-          typ: "sensor",
-          czas: d.toISOString(),
-          temperatura_C: lastCurrentSensorData.y[i]
-        }));
-        lastCurrentLublinData.x.forEach((d, i) => rows.push({
-          typ: "lublin",
-          czas: d.toISOString(),
-          temperatura_C: lastCurrentLublinData.temp[i]
-        }));
+        lastCurrentSensorData.x.forEach((d, i) => rows.push({ typ: "sensor", czas: d.toISOString(), temperatura_C: lastCurrentSensorData.y[i] }));
+        lastCurrentLublinData.x.forEach((d, i) => rows.push({ typ: "lublin", czas: d.toISOString(), temperatura_C: lastCurrentLublinData.temp[i] }));
         return rows;
       }
 
@@ -1827,9 +1916,7 @@ Założenia i interpretacja działania:
     function exportRowsToCsv(rows, fileName) {
       if (!rows.length) throw new Error("Brak danych do eksportu.");
       const headers = Object.keys(rows[0]);
-      const csv = [headers.join(";")]
-        .concat(rows.map(row => headers.map(h => JSON.stringify(row[h] ?? "")).join(";")))
-        .join("\n");
+      const csv = [headers.join(";")].concat(rows.map(row => headers.map(h => JSON.stringify(row[h] ?? "")).join(";"))).join("\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       downloadBlob(blob, fileName);
     }
@@ -1876,26 +1963,55 @@ Założenia i interpretacja działania:
       let overlay3dRenderMs = NaN;
       setProgress(0, "Przygotowanie pobierania...");
       setProgressTimes(NaN, NaN);
+      setProgressCounts(NaN, NaN);
       statusEl.textContent = "Pobieranie...";
 
       try {
         const range = getActiveRange();
 
-        const sensorPromise = fetchThingSpeakRange(range.start, range.end, MAX_POINTS, (done, total) => {
-          const pct = 5 + (done / Math.max(total, 1)) * 45;
-          setProgress(pct, `Pobieranie sensora: ${done}/${total} partii`);
+        let sensorCountLive = NaN;
+        let meteoCountLive = NaN;
+
+        const sensorPromise = fetchThingSpeakRange(range.start, range.end, MAX_POINTS, (done, total, phase, currentCount) => {
+          if (Number.isFinite(currentCount)) {
+            sensorCountLive = currentCount;
+            setProgressCounts(sensorCountLive, meteoCountLive);
+          }
+          if (phase === "fetch") {
+            const pct = 4 + (done / Math.max(total, 1)) * 38;
+            setProgress(pct, `Pobieranie sensora: ${done}/${total} partii`);
+          } else if (phase === "processing") {
+            setProgress(44, "Scalanie i filtrowanie danych sensora...");
+          } else if (phase === "finalizing") {
+            setProgress(46, "Redukcja liczby punktów sensora...");
+          } else if (phase === "done") {
+            setProgress(48, "Dane sensora gotowe.");
+          }
         });
 
         const lublinCurrentPromise = fetchLublinCurrent();
-        const lublinHistoryPromise = fetchLublinHistory(range.start, range.end);
+        const lublinHistoryPromise = fetchLublinHistory(range.start, range.end).then(data => {
+          meteoCountLive = data.temp.length;
+          setProgressCounts(sensorCountLive, meteoCountLive);
+          return data;
+        });
         const lublinModelPromise = fetchLublinModelLine(range.start, range.end);
         const sunDailyPromise = fetchLublinSunDaily();
-        const fullSensorPromise = fetchFullSensorDataset(false, (done, total, fromCache) => {
+
+        const fullSensorPromise = fetchFullSensorDataset(false, (done, total, fromCache, phase, count) => {
           if (fromCache) {
-            setProgress(78, "Pełny zbiór sensora z pamięci podręcznej");
-          } else {
-            const pct = 50 + (done / Math.max(total, 1)) * 28;
+            setProgress(74, "Pełny zbiór sensora z pamięci podręcznej");
+            return;
+          }
+          if (phase === "fetch") {
+            const pct = 50 + (done / Math.max(total, 1)) * 20;
             setProgress(pct, `Pobieranie pełnego zbioru sensora: ${done}/${total} partii`);
+          } else if (phase === "processing") {
+            setProgress(72, "Scalanie i filtrowanie pełnego zbioru sensora...");
+          } else if (phase === "finalizing") {
+            setProgress(76, "Redukcja liczby punktów pełnego zbioru sensora...");
+          } else if (phase === "done") {
+            setProgress(78, `Pełny zbiór sensora gotowy (${count ?? 0} próbek).`);
           }
         });
 
@@ -1909,21 +2025,32 @@ Założenia i interpretacja działania:
         ]);
 
         const fetchMs = performance.now() - fetchStart;
-        setProgress(82, "Dane pobrane. Przygotowanie wykresów...");
+        setProgress(80, "Dane pobrane. Przygotowanie wykresów...");
         setProgressTimes(fetchMs, NaN);
 
+        // Zapamiętanie ostatnich danych do eksportu.
         lastCurrentSensorData = sensorData;
         lastCurrentLublinData = lublinHistory;
         fullSensorCacheData = fullSensorData;
         fullSensorCacheTs = Date.now();
 
+        // Przygotowanie danych 3D od razu po pobraniu.
+        currentSensorPrepared3D = prepareOverlay3DData(sensorData, "Sensor");
+        currentMeteoPrepared3D = prepareOverlay3DData({ x: lublinHistory.x, y: lublinHistory.temp }, "Meteo");
+        fullSensorPrepared3D = prepareOverlay3DData(fullSensorData, "Sensor pełny");
+
         updateSensorOverlayAvailabilityFromData(sensorData);
         updateFullSensorOverlayAvailability(fullSensorData);
+        updateMeteoOverlayAvailabilityFromData(lublinHistory);
+        updateOverlayCompareAvailability(sensorData, lublinHistory);
+        setProgressCounts(sensorData.y.length, lublinHistory.temp.length);
         updateAnalysisPanel(sensorData, lublinHistory, lublinCurrent, sunDaily);
 
-        setProgress(86, "Rysowanie wykresów 2D...");
+        setProgress(84, "Rysowanie wykresów głównych 2D...");
         renderMainChart("mainChartSensorFocus", sensorData, lublinHistory, lublinModel, true);
         renderMainChart("mainChart", sensorData, lublinHistory, lublinModel, false);
+
+        setProgress(88, "Rysowanie wykresów pomocniczych 2D...");
         renderHistogram(sensorData.y);
         renderMeteoChart(lublinHistory);
         renderOverlayDaysChart(sensorData, lublinHistory);
@@ -1951,18 +2078,17 @@ Założenia i interpretacja działania:
           }
         }
 
-        setProgress(92, "Rysowanie wykresów 3D...");
+        setProgress(92, "Rysowanie wykresu Moliera 3D...");
         renderMollier3D(history3dPoints, current3dPoint);
 
-        overlay3dRenderMs = await renderSensorOverlay3D("sensorOverlay3dChart", sensorOverlay3dInfoEl, sensorData, sensor3dOverlayDays, {
-          useSpline: false,
-          projectionMode: "perspective"
-        });
+        setProgress(95, "Rysowanie górnego overlay 3D sensora...");
+        overlay3dRenderMs = await rerenderCurrentSensorOverlay3D();
 
-        await renderSensorOverlay3D("sensorOverlay3dFullChart", sensorOverlay3dFullInfoEl, fullSensorData, sensor3dFullOverlayDays, {
-          useSpline: true,
-          projectionMode: sensorOverlay3dProjectionEl.value
-        });
+        setProgress(97, "Rysowanie pełnego overlay 3D sensora...");
+        await rerenderFullSensorOverlay3D();
+
+        setProgress(99, "Rysowanie overlay 3D meteo...");
+        await rerenderCurrentMeteoOverlay3D();
 
         setProgress(100, "Gotowe.");
         setProgressTimes(fetchMs, overlay3dRenderMs);
@@ -1975,6 +2101,7 @@ Założenia i interpretacja działania:
         mollier3dInfoEl.textContent = "Nie udało się pobrać danych do wykresu Moliera 3D.";
         sensorOverlay3dInfoEl.textContent = "Nie udało się odświeżyć overlay 3D sensora.";
         sensorOverlay3dFullInfoEl.textContent = "Nie udało się odświeżyć pełnego overlay 3D sensora.";
+        meteoOverlay3dInfoEl.textContent = "Nie udało się odświeżyć overlay 3D meteo.";
       }
     }
 
@@ -2012,7 +2139,6 @@ Założenia i interpretacja działania:
       renderDashboard();
     }
 
-    // Przyciski szybkiego wyboru zakresu.
     document.querySelectorAll(".btn[data-hours]").forEach(button => {
       button.addEventListener("click", () => applyQuickRange(parseInt(button.dataset.hours, 10)));
     });
@@ -2057,7 +2183,13 @@ Założenia i interpretacja działania:
       renderDashboard();
     });
 
-    overlayDaysSelectEl.addEventListener("change", () => {
+    overlayDaysSliderEl.addEventListener("input", () => {
+      overlayCompareDays = parseInt(overlayDaysSliderEl.value, 10);
+      overlayDaysValueEl.textContent = `${formatDaysText(overlayCompareDays)} / max ${overlayCompareDaysMax}`;
+    });
+
+    overlayDaysSliderEl.addEventListener("change", () => {
+      overlayCompareDays = parseInt(overlayDaysSliderEl.value, 10);
       chartUiRevision++;
       renderDashboard();
     });
@@ -2071,7 +2203,17 @@ Założenia i interpretacja działania:
     sensorOverlay3dDaysSliderEl.addEventListener("change", () => {
       sensor3dOverlayAutoMaxPending = false;
       sensor3dOverlayDays = parseInt(sensorOverlay3dDaysSliderEl.value, 10);
-      renderDashboard();
+      rerenderCurrentSensorOverlay3D();
+    });
+
+    sensorOverlay3dProjectionEl.addEventListener("change", () => {
+      sensor3dProjectionMode = sensorOverlay3dProjectionEl.value;
+      rerenderCurrentSensorOverlay3D();
+    });
+
+    sensorOverlay3dDotsToggleEl.addEventListener("change", () => {
+      sensor3dShowDots = sensorOverlay3dDotsToggleEl.checked;
+      rerenderCurrentSensorOverlay3D();
     });
 
     sensorOverlay3dFullDaysSliderEl.addEventListener("input", () => {
@@ -2081,11 +2223,29 @@ Założenia i interpretacja działania:
 
     sensorOverlay3dFullDaysSliderEl.addEventListener("change", () => {
       sensor3dFullOverlayDays = parseInt(sensorOverlay3dFullDaysSliderEl.value, 10);
-      renderDashboard();
+      rerenderFullSensorOverlay3D();
     });
 
-    sensorOverlay3dProjectionEl.addEventListener("change", () => {
-      renderDashboard();
+    sensorOverlay3dFullProjectionEl.addEventListener("change", () => {
+      sensor3dFullProjectionMode = sensorOverlay3dFullProjectionEl.value;
+      rerenderFullSensorOverlay3D();
+    });
+
+    meteoOverlay3dDaysSliderEl.addEventListener("input", () => {
+      meteo3dOverlayAutoMaxPending = false;
+      meteo3dOverlayDays = parseInt(meteoOverlay3dDaysSliderEl.value, 10);
+      meteoOverlay3dDaysValueEl.textContent = `${formatDaysText(meteo3dOverlayDays)} / max ${meteoAvailableDaysMax}`;
+    });
+
+    meteoOverlay3dDaysSliderEl.addEventListener("change", () => {
+      meteo3dOverlayAutoMaxPending = false;
+      meteo3dOverlayDays = parseInt(meteoOverlay3dDaysSliderEl.value, 10);
+      rerenderCurrentMeteoOverlay3D();
+    });
+
+    meteoOverlay3dProjectionEl.addEventListener("change", () => {
+      meteo3dProjectionMode = meteoOverlay3dProjectionEl.value;
+      rerenderCurrentMeteoOverlay3D();
     });
 
     exportButtonEl.addEventListener("click", handleExport);
@@ -2108,10 +2268,12 @@ Założenia i interpretacja działania:
       syncActiveRangeButtons();
 
       sensor3dOverlayAutoMaxPending = true;
+      meteo3dOverlayAutoMaxPending = true;
       await renderDashboard();
       restartTimer();
     }
 
     initializeDashboard();
-  </script></body>
+  </script>
+</body>
 </html>
