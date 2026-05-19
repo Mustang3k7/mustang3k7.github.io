@@ -360,6 +360,7 @@ Założenia i interpretacja działania:
             <option value="orthographic">Nieperspektywiczna</option>
           </select>
           <label class="toggle-wrap" style="margin-left: 8px;"><span>Kropki</span><input id="sensorOverlay3dDotsToggle" type="checkbox" checked /></label>
+          <bu
         </div>
       </div>
       <div class="plot-frame"><div id="sensorOverlay3dChart"></div></div>
@@ -537,6 +538,17 @@ Założenia i interpretacja działania:
       const DEFAULT_TEMP_AXIS_MAX = 10;
       const AXIS_DATA_COVERAGE_TARGET = 0.8;
       const DEFAULT_START_DATE_STR = '2026-03-29T00:00';
+      const METEO_PAST_DAYS_LIMIT = 92;
+      const METEO_FORECAST_DAYS_LIMIT = 16;
+      const DAY_MS = 24 * 60 * 60 * 1000;
+
+      window.addEventListener('error', function (event) {
+        console.error('Błąd wykonania skryptu:', event.message, event.error || event.filename || 'brak szczegółów');
+      });
+
+      window.addEventListener('unhandledrejection', function (event) {
+        console.error('Nieobsłużony błąd asynchroniczny:', event.reason);
+      });
 
       let currentRangeHours = 8;
       let useCustomRange = false;
@@ -744,22 +756,45 @@ Założenia i interpretacja działania:
         return { x: x, y: y };
       }
 
+      function getFiniteNumbers(values) {
+        if (!Array.isArray(values)) return [];
+        const out = [];
+        for (let i = 0; i < values.length; i++) {
+          const n = Number(values[i]);
+          if (Number.isFinite(n)) out.push(n);
+        }
+        return out;
+      }
+
       function computePaddedYRange(values) {
-        if (!values || values.length === 0) return null;
-        const minVal = Math.min.apply(null, values);
-        const maxVal = Math.max.apply(null, values);
+        const finite = getFiniteNumbers(values);
+        if (!finite.length) return null;
+        let minVal = finite[0];
+        let maxVal = finite[0];
+        for (let i = 1; i < finite.length; i++) {
+          if (finite[i] < minVal) minVal = finite[i];
+          if (finite[i] > maxVal) maxVal = finite[i];
+        }
         const span = Math.max(maxVal - minVal, 0.3);
         const pad = span * 0.08;
         return [minVal - pad, maxVal + pad];
       }
 
       function calculateStats(values) {
-        if (!values || values.length === 0) return null;
-        const min = Math.min.apply(null, values);
-        const max = Math.max.apply(null, values);
-        const avg = values.reduce(function (sum, v) { return sum + v; }, 0) / values.length;
+        const finite = getFiniteNumbers(values);
+        if (!finite.length) return null;
+        let min = finite[0];
+        let max = finite[0];
+        let sum = finite[0];
+        for (let i = 1; i < finite.length; i++) {
+          const v = finite[i];
+          if (v < min) min = v;
+          if (v > max) max = v;
+          sum += v;
+        }
+        const avg = sum / finite.length;
         const amplitude = max - min;
-        const trend = values[values.length - 1] - values[0];
+        const trend = finite[finite.length - 1] - finite[0];
         return { min: min, max: max, avg: avg, amplitude: amplitude, trend: trend };
       }
 
@@ -829,6 +864,23 @@ Założenia i interpretacja działania:
         return 1.006 * tempC + humidityRatioKgKg * (2501 + 1.86 * tempC);
       }
 
+      async function fetchJson(url, label) {
+        const response = await fetch(url);
+        const text = await response.text();
+        if (!response.ok) {
+          throw new Error((label || 'Żądanie') + ': HTTP ' + response.status + ' | ' + text.slice(0, 180));
+        }
+        try {
+          return JSON.parse(text);
+        } catch (error) {
+          throw new Error((label || 'Żądanie') + ': odpowiedź nie jest poprawnym JSON. Początek odpowiedzi: ' + text.slice(0, 180));
+        }
+      }
+
+      function isValidDate(date) {
+        return date instanceof Date && !Number.isNaN(date.getTime());
+      }
+
       async function fetchThingSpeakRange(startDate, endDate, maxPoints, progressCallback) {
         const pointsLimit = typeof maxPoints === 'number' ? maxPoints : MAX_POINTS;
         const allX = [];
@@ -845,15 +897,18 @@ Założenia i interpretacja działania:
           let url = 'https://api.thingspeak.com/channels/' + CHANNEL_ID + '/fields/' + FIELD + '.json?start=' + encodeURIComponent(formatThingSpeakDateUTC(chunkStart)) + '&end=' + encodeURIComponent(formatThingSpeakDateUTC(chunkEnd)) + '&results=8000';
           if (READ_API_KEY && READ_API_KEY.length > 0) url += '&api_key=' + READ_API_KEY;
 
-          const response = await fetch(url);
-          const data = await response.json();
+          const data = await fetchJson(url, 'ThingSpeak');
           const feeds = data && data.feeds ? data.feeds : [];
 
           for (let i = 0; i < feeds.length; i++) {
             const feed = feeds[i];
             if (feed.field1 !== null && feed.field1 !== undefined) {
-              allX.push(new Date(feed.created_at));
-              allY.push(parseFloat(feed.field1));
+              const parsedValue = parseFloat(feed.field1);
+              const pointDate = new Date(feed.created_at);
+              if (Number.isFinite(parsedValue) && isValidDate(pointDate)) {
+                allX.push(pointDate);
+                allY.push(parsedValue);
+              }
             }
           }
 
@@ -875,8 +930,7 @@ Założenia i interpretacja działania:
         if (sensorOldestTimestampCache) return sensorOldestTimestampCache;
         const ancientStart = encodeURIComponent('2000-01-01 00:00:00');
         const url = 'https://api.thingspeak.com/channels/' + CHANNEL_ID + '/fields/' + FIELD + '.json?start=' + ancientStart + '&results=1' + (READ_API_KEY ? '&api_key=' + READ_API_KEY : '');
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await fetchJson(url, 'ThingSpeak najstarszy punkt');
 
         if (data && data.feeds && data.feeds.length && data.feeds[0] && data.feeds[0].created_at) {
           sensorOldestTimestampCache = new Date(data.feeds[0].created_at);
@@ -884,8 +938,7 @@ Założenia i interpretacja działania:
         }
 
         const fallbackUrl = 'https://api.thingspeak.com/channels/' + CHANNEL_ID + '.json' + (READ_API_KEY ? '?api_key=' + READ_API_KEY : '');
-        const fallbackResponse = await fetch(fallbackUrl);
-        const fallbackData = await fallbackResponse.json();
+        const fallbackData = await fetchJson(fallbackUrl, 'ThingSpeak metadane kanału');
         sensorOldestTimestampCache = fallbackData && fallbackData.created_at ? new Date(fallbackData.created_at) : new Date();
         return sensorOldestTimestampCache;
       }
@@ -913,8 +966,7 @@ Założenia i interpretacja działania:
       async function getLublinGeo() {
         if (lublinGeo) return lublinGeo;
         const url = 'https://geocoding-api.open-meteo.com/v1/search?name=Lublin&count=1&language=pl&format=json';
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await fetchJson(url, 'Geokodowanie Lublina');
         if (!data || !data.results || !data.results.length) throw new Error('Nie znaleziono Lublina.');
         lublinGeo = { latitude: data.results[0].latitude, longitude: data.results[0].longitude };
         return lublinGeo;
@@ -923,8 +975,7 @@ Założenia i interpretacja działania:
       async function fetchLublinCurrent() {
         const geo = await getLublinGeo();
         const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + geo.latitude + '&longitude=' + geo.longitude + '&current=temperature_2m,relative_humidity_2m,pressure_msl&timezone=GMT';
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await fetchJson(url, 'Open-Meteo aktualne dane');
         const current = data && data.current ? data.current : {};
         const temp = current.temperature_2m;
         const rh = current.relative_humidity_2m;
@@ -941,19 +992,21 @@ Założenia i interpretacja działania:
 
       async function fetchLublinHistory(startDate, endDate) {
         const geo = await getLublinGeo();
-        const startDateApi = formatDateForApiUTC(startDate);
-        const endDateApi = formatDateForApiUTC(endDate);
-        const url = 'https://archive-api.open-meteo.com/v1/archive?latitude=' + geo.latitude + '&longitude=' + geo.longitude + '&start_date=' + startDateApi + '&end_date=' + endDateApi + '&hourly=temperature_2m,relative_humidity_2m,pressure_msl&timezone=GMT';
-        const response = await fetch(url);
-        const data = await response.json();
+        const now = new Date();
+        const safeStart = startDate < new Date(now.getTime() - METEO_PAST_DAYS_LIMIT * DAY_MS)
+          ? new Date(now.getTime() - METEO_PAST_DAYS_LIMIT * DAY_MS)
+          : startDate;
+        const requestedPastDays = Math.ceil(Math.max(0, now.getTime() - safeStart.getTime()) / DAY_MS) + 1;
+        const requestedFutureDays = Math.ceil(Math.max(0, endDate.getTime() - now.getTime()) / DAY_MS) + 1;
+        const pastDays = Math.max(1, Math.min(METEO_PAST_DAYS_LIMIT, requestedPastDays));
+        const forecastDays = Math.max(1, Math.min(METEO_FORECAST_DAYS_LIMIT, requestedFutureDays));
+        const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + geo.latitude + '&longitude=' + geo.longitude + '&hourly=temperature_2m,relative_humidity_2m,pressure_msl&past_days=' + pastDays + '&forecast_days=' + forecastDays + '&timezone=GMT';
+        const data = await fetchJson(url, 'Open-Meteo historia/prognoza godzinowa');
         const hourly = data && data.hourly ? data.hourly : {};
         const rawTimes = hourly.time || [];
-        const times = rawTimes.map(function (t) { return new Date(t + 'Z'); });
         const temps = hourly.temperature_2m || [];
         const rhs = hourly.relative_humidity_2m || [];
         const pressures = hourly.pressure_msl || [];
-        const absHum = temps.map(function (t, i) { return calculateAbsoluteHumidity(t, rhs[i]); });
-        const dewPoints = temps.map(function (t, i) { return calculateDewPoint(t, rhs[i]); });
 
         const filteredTime = [];
         const filteredTemp = [];
@@ -964,15 +1017,21 @@ Założenia i interpretacja działania:
         const startMs = startDate.getTime();
         const endMs = endDate.getTime();
 
-        for (let i = 0; i < times.length; i++) {
-          const ms = times[i].getTime();
-          if (ms >= startMs && ms <= endMs) {
-            filteredTime.push(times[i]);
-            filteredTemp.push(temps[i]);
-            filteredRH.push(rhs[i]);
-            filteredAH.push(absHum[i]);
-            filteredPressure.push(pressures[i]);
-            filteredDewPoint.push(dewPoints[i]);
+        for (let i = 0; i < rawTimes.length; i++) {
+          const time = new Date(rawTimes[i] + 'Z');
+          const ms = time.getTime();
+          const temp = Number(temps[i]);
+          const rh = Number(rhs[i]);
+          const pressure = Number(pressures[i]);
+          if (ms >= startMs && ms <= endMs && isValidDate(time) && Number.isFinite(temp)) {
+            const safeRh = Number.isFinite(rh) ? rh : null;
+            const safePressure = Number.isFinite(pressure) ? pressure : 1013.25;
+            filteredTime.push(time);
+            filteredTemp.push(temp);
+            filteredRH.push(safeRh);
+            filteredAH.push(calculateAbsoluteHumidity(temp, safeRh));
+            filteredPressure.push(safePressure);
+            filteredDewPoint.push(calculateDewPoint(temp, safeRh));
           }
         }
 
@@ -983,15 +1042,26 @@ Założenia i interpretacja działania:
         const geo = await getLublinGeo();
         const now = new Date();
         const msBack = Math.max(0, now.getTime() - startDate.getTime());
-        const daysBack = Math.max(1, Math.ceil(msBack / (24 * 60 * 60 * 1000)));
+        const daysBack = Math.max(1, Math.min(METEO_PAST_DAYS_LIMIT, Math.ceil(msBack / DAY_MS) + 1));
         const msForward = Math.max(0, endDate.getTime() - now.getTime());
-        const daysForwardFromRange = Math.ceil(msForward / (24 * 60 * 60 * 1000));
-        const forecastDays = Math.max(FUTURE_FORECAST_DAYS, daysForwardFromRange + 1);
+        const daysForwardFromRange = Math.ceil(msForward / DAY_MS) + 1;
+        const forecastDays = Math.max(FUTURE_FORECAST_DAYS, Math.min(METEO_FORECAST_DAYS_LIMIT, daysForwardFromRange));
         const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + geo.latitude + '&longitude=' + geo.longitude + '&hourly=temperature_2m&past_days=' + daysBack + '&forecast_days=' + forecastDays + '&timezone=GMT';
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await fetchJson(url, 'Open-Meteo linia modelu');
         const hourly = data && data.hourly ? data.hourly : {};
-        return { x: (hourly.time || []).map(function (t) { return new Date(t + 'Z'); }), temp: hourly.temperature_2m || [] };
+        const rawTimes = hourly.time || [];
+        const rawTemps = hourly.temperature_2m || [];
+        const x = [];
+        const temp = [];
+        for (let i = 0; i < rawTimes.length; i++) {
+          const d = new Date(rawTimes[i] + 'Z');
+          const v = Number(rawTemps[i]);
+          if (isValidDate(d) && Number.isFinite(v)) {
+            x.push(d);
+            temp.push(v);
+          }
+        }
+        return { x: x, temp: temp };
       }
 
       async function fetchLublinSunDaily() {
@@ -1003,8 +1073,7 @@ Założenia i interpretacja działania:
         const startDate = localDate.getFullYear() + '-' + pad(localDate.getMonth() + 1) + '-' + pad(localDate.getDate());
         const endDate = tomorrow.getFullYear() + '-' + pad(tomorrow.getMonth() + 1) + '-' + pad(tomorrow.getDate());
         const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + geo.latitude + '&longitude=' + geo.longitude + '&daily=sunrise,sunset&timezone=Europe/Warsaw&start_date=' + startDate + '&end_date=' + endDate;
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await fetchJson(url, 'Open-Meteo wschód/zachód słońca');
         const daily = data && data.daily ? data.daily : {};
         return { sunrise: daily.sunrise ? daily.sunrise[0] : null, sunset: daily.sunset ? daily.sunset[0] : null };
       }
@@ -1379,13 +1448,19 @@ Założenia i interpretacja działania:
 
       function prepareOverlay3DData(seriesData, seriesLabel) {
         const grouped = new Map();
-        for (let i = 0; i < seriesData.x.length; i++) {
-          const d = seriesData.x[i];
+        const xs = seriesData && Array.isArray(seriesData.x) ? seriesData.x : [];
+        const ys = seriesData && Array.isArray(seriesData.y) ? seriesData.y : [];
+        let pointCount = 0;
+        for (let i = 0; i < Math.min(xs.length, ys.length); i++) {
+          const d = xs[i];
+          const value = Number(ys[i]);
+          if (!isValidDate(d) || !Number.isFinite(value)) continue;
           const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
           if (!grouped.has(key)) grouped.set(key, []);
-          grouped.get(key).push({ hour: d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600, value: seriesData.y[i], date: d });
+          grouped.get(key).push({ hour: d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600, value: value, date: d });
+          pointCount += 1;
         }
-        return { grouped: grouped, dayKeys: Array.from(grouped.keys()).sort(), pointCount: seriesData.y.length, seriesLabel: seriesLabel || 'Sensor' };
+        return { grouped: grouped, dayKeys: Array.from(grouped.keys()).sort(), pointCount: pointCount, seriesLabel: seriesLabel || 'Sensor' };
       }
 
       function prepareCombinedOverlay3DData(sensorData, meteoData) {
@@ -1471,7 +1546,7 @@ Założenia i interpretacja działania:
             customdata: points.map(function (p, i) { return [seriesName, dayKey, p.date.toLocaleTimeString('pl-PL'), p.value, zTemps[i]]; }),
             line: { width: lineWidth, color: baseColor },
             opacity: opacity,
-            marker: cfg.showMarkers ? { size: 3, color: baseColor } : undefined,
+            marker: cfg.showMarkers ? { size: 3, color: baseColor } : { size: 0.01, color: baseColor },
             hovertemplate: '%{customdata[0]}: %{customdata[3]:.2f} °C<br>Dzień: %{customdata[1]}<br>Godzina: %{customdata[2]}<br>Wartość na linii: %{customdata[4]:.2f} °C<extra>%{customdata[0]}</extra>'
           });
         }
@@ -1787,7 +1862,7 @@ Założenia i interpretacja działania:
           }).filter(function (p) { return Number.isFinite(p.temp) && Number.isFinite(p.enthalpy); });
 
           let current3dPoint = null;
-          if (lublinCurrent && Number.isFinite(lublinCurrent.currentTemp) && Number.isFinite(lublinCurrent.currentRH)) {
+          if (lublinCurrent && Number.isFinite(lublinCurrent.currentTemp) && Number.isFinite(lublinCurrent.currentRH) && isValidDate(lublinCurrent.currentTime)) {
             const currentHumidityRatio = calculateHumidityRatio(lublinCurrent.currentTemp, lublinCurrent.currentRH, lublinCurrent.currentPressure || 1013.25);
             const currentEnthalpy = calculateEnthalpy(lublinCurrent.currentTemp, currentHumidityRatio);
             if (Number.isFinite(currentEnthalpy)) current3dPoint = { time: lublinCurrent.currentTime, temp: lublinCurrent.currentTemp, enthalpy: currentEnthalpy };
@@ -1857,8 +1932,10 @@ Założenia i interpretacja działania:
 
       function runSelfTests() {
         console.assert(formatHoursLabel(24) === '24 h (1.00 dni)', 'Test formatHoursLabel nie przeszedł.');
-        const r = computePaddedYRange([1, 2]);
-        console.assert(Array.isArray(r) && r.length === 2, 'Test computePaddedYRange nie przeszedł.');
+        const r = computePaddedYRange([1, 2, null, NaN, 'x']);
+        console.assert(Array.isArray(r) && r.length === 2 && r[0] < 1 && r[1] > 2, 'Test computePaddedYRange nie przeszedł.');
+        const stats = calculateStats([null, 1, 3, NaN]);
+        console.assert(stats && stats.min === 1 && stats.max === 3 && stats.avg === 2, 'Test calculateStats nie przeszedł.');
         const smoothed = smoothNumericSeries([1, 2, 3], 1);
         console.assert(smoothed.length === 3, 'Test smoothNumericSeries nie przeszedł.');
         const prepared = prepareOverlay3DData({ x: [new Date('2026-03-29T01:00:00'), new Date('2026-03-29T02:00:00')], y: [20, 21] }, 'Sensor');
