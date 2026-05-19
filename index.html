@@ -177,6 +177,36 @@ Założenia i interpretacja działania:
       gap: 8px;
     }
 
+    .progress-wrap {
+      display: grid;
+      gap: 8px;
+      padding-top: 2px;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 12px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: #121b2c;
+      border: 1px solid var(--border);
+    }
+
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #2563eb 0%, #38bdf8 100%);
+      transition: width 0.2s ease;
+    }
+
+    .progress-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+    }
+
     .slider-head {
       display: flex;
       justify-content: space-between;
@@ -420,7 +450,15 @@ Założenia i interpretacja działania:
       <button id="resetRangeBtn" class="btn">Wróć do szybkiego zakresu</button>
     </div>
   </div>
-</section>
+
+      <div class="progress-wrap">
+        <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+        <div class="progress-meta">
+          <div id="progressText" class="status">Gotowość.</div>
+          <div id="progressTimes" class="status">Pobieranie: — | Overlay 3D: —</div>
+        </div>
+      </div>
+    </section>
 
 <!-- ===================================================================== -->
 <!-- OVERLAY 3D DLA AKTUALNIE POBRANEGO ZAKRESU                              -->
@@ -609,6 +647,7 @@ Założenia i interpretacja działania:
     const DEFAULT_TEMP_AXIS_MIN = -40;
     const DEFAULT_TEMP_AXIS_MAX = 10;
     const AXIS_DATA_COVERAGE_TARGET = 0.8;
+    const DEFAULT_START_DATE_STR = "2026-03-29T00:00";
 
     // =======================================================================
     // STAN APLIKACJI
@@ -621,6 +660,7 @@ Założenia i interpretacja działania:
     let sensor3dOverlayDays = 3;
     let sensorAvailableDaysMax = 1;
     let sensorOldestTimestampCache = null;
+    let sensor3dOverlayAutoMaxPending = true;
 
     // Stan dla dolnego, pełnego overlay 3D.
     let sensor3dFullOverlayDays = 7;
@@ -671,6 +711,9 @@ Założenia i interpretacja działania:
     const exportFormatSelectEl = document.getElementById("exportFormatSelect");
     const exportButtonEl = document.getElementById("exportButton");
     const exportInfoEl = document.getElementById("exportInfo");
+    const progressFillEl = document.getElementById("progressFill");
+    const progressTextEl = document.getElementById("progressText");
+    const progressTimesEl = document.getElementById("progressTimes");
 
     const analysisIds = {
       sensor: {
@@ -735,6 +778,22 @@ Założenia i interpretacja działania:
 
     function formatDaysText(days) {
       return days === 1 ? "1 dzień" : `${days} dni`;
+    }
+
+    function formatDurationMs(ms) {
+      if (!Number.isFinite(ms)) return "—";
+      if (ms < 1000) return `${Math.round(ms)} ms`;
+      return `${(ms / 1000).toFixed(2)} s`;
+    }
+
+    function setProgress(percent, text) {
+      const safe = Math.max(0, Math.min(100, percent));
+      progressFillEl.style.width = `${safe.toFixed(1)}%`;
+      progressTextEl.textContent = text;
+    }
+
+    function setProgressTimes(fetchMs, overlayMs) {
+      progressTimesEl.textContent = `Pobieranie: ${formatDurationMs(fetchMs)} | Overlay 3D: ${formatDurationMs(overlayMs)}`;
     }
 
     function getActiveRange() {
@@ -849,14 +908,21 @@ Założenia i interpretacja działania:
     // =======================================================================
     // POBIERANIE DANYCH Z THINGSPEAK
     // =======================================================================
-    async function fetchThingSpeakRange(startDate, endDate, maxPoints = MAX_POINTS) {
+    async function fetchThingSpeakRange(startDate, endDate, maxPoints = MAX_POINTS, progressCallback = null) {
       const allX = [];
       const allY = [];
       let chunkStart = new Date(startDate.getTime());
+      const chunkMs = THINGSPEAK_CHUNK_HOURS * 60 * 60 * 1000;
+      const totalChunks = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / chunkMs));
+      let completedChunks = 0;
+
+      if (progressCallback) {
+        progressCallback(completedChunks, totalChunks);
+      }
 
       // Pobieranie partiami dobowymi, żeby nie przekroczyć limitu API.
       while (chunkStart < endDate) {
-        const chunkEnd = new Date(Math.min(chunkStart.getTime() + THINGSPEAK_CHUNK_HOURS * 60 * 60 * 1000, endDate.getTime()));
+        const chunkEnd = new Date(Math.min(chunkStart.getTime() + chunkMs, endDate.getTime()));
         let url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/fields/${FIELD}.json?start=${encodeURIComponent(formatThingSpeakDateUTC(chunkStart))}&end=${encodeURIComponent(formatThingSpeakDateUTC(chunkEnd))}&results=8000`;
         if (READ_API_KEY && READ_API_KEY.length > 0) url += `&api_key=${READ_API_KEY}`;
 
@@ -870,6 +936,11 @@ Założenia i interpretacja działania:
               allY.push(parseFloat(feed.field1));
             }
           });
+        }
+
+        completedChunks++;
+        if (progressCallback) {
+          progressCallback(completedChunks, totalChunks);
         }
 
         chunkStart = new Date(chunkEnd.getTime() + 1000);
@@ -900,16 +971,19 @@ Założenia i interpretacja działania:
       return sensorOldestTimestampCache;
     }
 
-    async function fetchFullSensorDataset(force = false) {
+    async function fetchFullSensorDataset(force = false, progressCallback = null) {
       const nowMs = Date.now();
       const cacheIsFresh = fullSensorCacheData && (nowMs - fullSensorCacheTs < 5 * 60 * 1000);
       if (!force && cacheIsFresh) {
+        if (progressCallback) {
+          progressCallback(1, 1, true);
+        }
         return fullSensorCacheData;
       }
 
       const oldest = await fetchSensorOldestTimestampApprox();
       const now = new Date();
-      const data = await fetchThingSpeakRange(oldest, now, FULL_SENSOR_MAX_POINTS);
+      const data = await fetchThingSpeakRange(oldest, now, FULL_SENSOR_MAX_POINTS, progressCallback ? (done, total) => progressCallback(done, total, false) : null);
 
       fullSensorCacheData = data;
       fullSensorCacheTs = nowMs;
@@ -921,8 +995,15 @@ Założenia i interpretacja działania:
         sensorData.x.map(d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`)
       );
       sensorAvailableDaysMax = Math.max(1, uniqueDays.size);
-      if (sensor3dOverlayDays > sensorAvailableDaysMax) sensor3dOverlayDays = sensorAvailableDaysMax;
-      if (sensor3dOverlayDays < 1) sensor3dOverlayDays = 1;
+
+      if (sensor3dOverlayAutoMaxPending) {
+        sensor3dOverlayDays = sensorAvailableDaysMax;
+        sensor3dOverlayAutoMaxPending = false;
+      } else {
+        if (sensor3dOverlayDays > sensorAvailableDaysMax) sensor3dOverlayDays = sensorAvailableDaysMax;
+        if (sensor3dOverlayDays < 1) sensor3dOverlayDays = 1;
+      }
+
       sensorOverlay3dDaysSliderEl.max = String(sensorAvailableDaysMax);
       sensorOverlay3dDaysSliderEl.value = String(sensor3dOverlayDays);
       sensorOverlay3dDaysValueEl.textContent = `${formatDaysText(sensor3dOverlayDays)} / max ${sensorAvailableDaysMax}`;
@@ -1633,10 +1714,12 @@ Założenia i interpretacja działania:
     }
 
     function renderSensorOverlay3D(chartId, infoEl, sensorData, selectedDays, options = {}) {
+      const renderStart = performance.now();
+
       if (!sensorData.x.length || !sensorData.y.length) {
         Plotly.react(chartId, [], {}, getCommonPlotConfig());
         infoEl.textContent = "Brak danych sensora do overlay 3D.";
-        return;
+        return Promise.resolve(0);
       }
 
       const grouped = groupSensorByDay(sensorData);
@@ -1686,8 +1769,11 @@ Założenia i interpretacja działania:
         showlegend: true
       };
 
-      Plotly.react(chartId, build.traces, layout, getCommonPlotConfig());
-      infoEl.textContent = `Overlay 3D sensora | dni na wykresie: ${dayKeys.length} | punktów: ${sensorData.y.length} | projekcja: ${options.projectionMode || "perspective"}${options.useSpline ? " | wygładzenie: spline" : " | wygładzenie: brak"}`;
+      return Promise.resolve(Plotly.react(chartId, build.traces, layout, getCommonPlotConfig())).then(() => {
+        const renderMs = performance.now() - renderStart;
+        infoEl.textContent = `Overlay 3D sensora | dni na wykresie: ${dayKeys.length} | punktów: ${sensorData.y.length} | projekcja: ${options.projectionMode || "perspective"}${options.useSpline ? " | wygładzenie: spline" : " | wygładzenie: brak"} | odświeżenie: ${formatDurationMs(renderMs)}`;
+        return renderMs;
+      });
     }
 
     // =======================================================================
@@ -1786,35 +1872,56 @@ Założenia i interpretacja działania:
     // GŁÓWNA AKTUALIZACJA DASHBOARDU
     // =======================================================================
     async function renderDashboard() {
+      const fetchStart = performance.now();
+      let overlay3dRenderMs = NaN;
+      setProgress(0, "Przygotowanie pobierania...");
+      setProgressTimes(NaN, NaN);
       statusEl.textContent = "Pobieranie...";
 
       try {
         const range = getActiveRange();
 
-        // Równoległe pobranie danych potrzebnych do głównego widoku.
+        const sensorPromise = fetchThingSpeakRange(range.start, range.end, MAX_POINTS, (done, total) => {
+          const pct = 5 + (done / Math.max(total, 1)) * 45;
+          setProgress(pct, `Pobieranie sensora: ${done}/${total} partii`);
+        });
+
+        const lublinCurrentPromise = fetchLublinCurrent();
+        const lublinHistoryPromise = fetchLublinHistory(range.start, range.end);
+        const lublinModelPromise = fetchLublinModelLine(range.start, range.end);
+        const sunDailyPromise = fetchLublinSunDaily();
+        const fullSensorPromise = fetchFullSensorDataset(false, (done, total, fromCache) => {
+          if (fromCache) {
+            setProgress(78, "Pełny zbiór sensora z pamięci podręcznej");
+          } else {
+            const pct = 50 + (done / Math.max(total, 1)) * 28;
+            setProgress(pct, `Pobieranie pełnego zbioru sensora: ${done}/${total} partii`);
+          }
+        });
+
         const [sensorData, lublinCurrent, lublinHistory, lublinModel, sunDaily, fullSensorData] = await Promise.all([
-          fetchThingSpeakRange(range.start, range.end),
-          fetchLublinCurrent(),
-          fetchLublinHistory(range.start, range.end),
-          fetchLublinModelLine(range.start, range.end),
-          fetchLublinSunDaily(),
-          fetchFullSensorDataset(false)
+          sensorPromise,
+          lublinCurrentPromise,
+          lublinHistoryPromise,
+          lublinModelPromise,
+          sunDailyPromise,
+          fullSensorPromise
         ]);
 
-        // Zapamiętanie ostatnich danych do eksportu.
+        const fetchMs = performance.now() - fetchStart;
+        setProgress(82, "Dane pobrane. Przygotowanie wykresów...");
+        setProgressTimes(fetchMs, NaN);
+
         lastCurrentSensorData = sensorData;
         lastCurrentLublinData = lublinHistory;
         fullSensorCacheData = fullSensorData;
         fullSensorCacheTs = Date.now();
 
-        // Aktualizacja ograniczeń suwaków overlay 3D.
         updateSensorOverlayAvailabilityFromData(sensorData);
         updateFullSensorOverlayAvailability(fullSensorData);
-
-        // Aktualizacja paneli tekstowych.
         updateAnalysisPanel(sensorData, lublinHistory, lublinCurrent, sunDaily);
 
-        // Wykresy 2D.
+        setProgress(86, "Rysowanie wykresów 2D...");
         renderMainChart("mainChartSensorFocus", sensorData, lublinHistory, lublinModel, true);
         renderMainChart("mainChart", sensorData, lublinHistory, lublinModel, false);
         renderHistogram(sensorData.y);
@@ -1822,7 +1929,6 @@ Założenia i interpretacja działania:
         renderOverlayDaysChart(sensorData, lublinHistory);
         renderMollierChart(lublinCurrent);
 
-        // Molier 3D.
         const history3dPoints = lublinHistory.x.map((time, i) => {
           const temp = lublinHistory.temp[i];
           const rh = lublinHistory.rh[i];
@@ -1844,23 +1950,27 @@ Założenia i interpretacja działania:
             };
           }
         }
+
+        setProgress(92, "Rysowanie wykresów 3D...");
         renderMollier3D(history3dPoints, current3dPoint);
 
-        // Overlay 3D z bieżącego zakresu.
-        renderSensorOverlay3D("sensorOverlay3dChart", sensorOverlay3dInfoEl, sensorData, sensor3dOverlayDays, {
+        overlay3dRenderMs = await renderSensorOverlay3D("sensorOverlay3dChart", sensorOverlay3dInfoEl, sensorData, sensor3dOverlayDays, {
           useSpline: false,
           projectionMode: "perspective"
         });
 
-        // Overlay 3D z pełnego zbioru.
-        renderSensorOverlay3D("sensorOverlay3dFullChart", sensorOverlay3dFullInfoEl, fullSensorData, sensor3dFullOverlayDays, {
+        await renderSensorOverlay3D("sensorOverlay3dFullChart", sensorOverlay3dFullInfoEl, fullSensorData, sensor3dFullOverlayDays, {
           useSpline: true,
           projectionMode: sensorOverlay3dProjectionEl.value
         });
 
+        setProgress(100, "Gotowe.");
+        setProgressTimes(fetchMs, overlay3dRenderMs);
         statusEl.textContent = `OK | od ${formatDateTime(range.start)} do ${formatDateTime(range.end)} | S: ${sensorData.y.length} | L: ${lublinHistory.temp.length}`;
       } catch (error) {
         console.error(error);
+        setProgress(100, "Błąd pobierania danych.");
+        setProgressTimes(performance.now() - fetchStart, overlay3dRenderMs);
         statusEl.textContent = "Błąd pobierania";
         mollier3dInfoEl.textContent = "Nie udało się pobrać danych do wykresu Moliera 3D.";
         sensorOverlay3dInfoEl.textContent = "Nie udało się odświeżyć overlay 3D sensora.";
@@ -1953,11 +2063,13 @@ Założenia i interpretacja działania:
     });
 
     sensorOverlay3dDaysSliderEl.addEventListener("input", () => {
+      sensor3dOverlayAutoMaxPending = false;
       sensor3dOverlayDays = parseInt(sensorOverlay3dDaysSliderEl.value, 10);
       sensorOverlay3dDaysValueEl.textContent = `${formatDaysText(sensor3dOverlayDays)} / max ${sensorAvailableDaysMax}`;
     });
 
     sensorOverlay3dDaysSliderEl.addEventListener("change", () => {
+      sensor3dOverlayAutoMaxPending = false;
       sensor3dOverlayDays = parseInt(sensorOverlay3dDaysSliderEl.value, 10);
       renderDashboard();
     });
@@ -1981,8 +2093,25 @@ Założenia i interpretacja działania:
     // =======================================================================
     // START
     // =======================================================================
-    syncSliderLabel();
-    applyQuickRange(8);
-    restartTimer();
+    async function initializeDashboard() {
+      const now = new Date();
+      const defaultStart = new Date(DEFAULT_START_DATE_STR);
+      useCustomRange = true;
+      startDateEl.value = toLocalInputValue(defaultStart);
+      endDateEl.value = toLocalInputValue(now);
+
+      const totalHours = Math.max(1, Math.ceil((now.getTime() - defaultStart.getTime()) / (60 * 60 * 1000)));
+      currentRangeHours = totalHours;
+      hoursSliderEl.max = String(Math.max(720, totalHours));
+      hoursSliderEl.value = String(totalHours);
+      sliderHoursValueEl.textContent = formatHoursLabel(totalHours);
+      syncActiveRangeButtons();
+
+      sensor3dOverlayAutoMaxPending = true;
+      await renderDashboard();
+      restartTimer();
+    }
+
+    initializeDashboard();
   </script></body>
 </html>
