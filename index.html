@@ -170,6 +170,18 @@ Założenia i interpretacja działania:
       color: white;
     }
 
+    .btn-priority {
+      background: linear-gradient(180deg, #f59e0b, #d97706);
+      border-color: #fbbf24;
+      color: #111827;
+      font-weight: 800;
+      box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.35), 0 8px 20px rgba(245, 158, 11, 0.22);
+    }
+
+    .btn-priority:hover {
+      filter: brightness(1.08);
+    }
+
     .toggle-wrap {
       display: inline-flex;
       align-items: center;
@@ -356,7 +368,7 @@ Założenia i interpretacja działania:
           <label for="endDate">Do:</label>
           <input id="endDate" class="dt-input" type="datetime-local" />
           <button id="applyRangeBtn" class="btn">Zastosuj okres</button>
-          <button id="loadDefaultStartBtn" class="btn">Załaduj od 29.03.2026</button>
+          <button id="loadDefaultStartBtn" class="btn btn-priority">Załaduj od 29.03.2026</button>
           <button id="resetRangeBtn" class="btn">Wróć do szybkiego zakresu</button>
         </div>
       </div>
@@ -652,6 +664,8 @@ Założenia i interpretacja działania:
       let progressVisibleValue = 0;
       let renderDashboardInProgress = false;
       let renderDashboardQueued = false;
+      let renderDashboardRestartRequested = false;
+      let activeDashboardAbortController = null;
       let customRangeEndFollowsNow = false;
       let defaultStartFullRangeEnabled = false;
       let forceMaxOverlaySlidersOnNextRender = false;
@@ -1150,12 +1164,26 @@ Założenia i interpretacja działania:
         return 1.006 * tempC + humidityRatioKgKg * (2501 + 1.86 * tempC);
       }
 
-      async function fetchJson(url, label) {
-        const response = await fetch(url);
+      function throwIfAborted(signal) {
+        if (signal && signal.aborted) {
+          const error = new Error('Operacja przerwana przez nowsze polecenie.');
+          error.name = 'AbortError';
+          throw error;
+        }
+      }
+
+      function isAbortError(error) {
+        return !!error && (error.name === 'AbortError' || String(error.message || '').indexOf('przerwana') >= 0);
+      }
+
+      async function fetchJson(url, label, signal) {
+        throwIfAborted(signal);
+        const response = await fetch(url, { signal: signal });
         const text = await response.text();
         if (!response.ok) {
           throw new Error((label || 'Żądanie') + ': HTTP ' + response.status + ' | ' + text.slice(0, 180));
         }
+        throwIfAborted(signal);
         try {
           return JSON.parse(text);
         } catch (error) {
@@ -1179,12 +1207,13 @@ Założenia i interpretacja działania:
 
       function fallbackOnError(promise, label, fallbackValue) {
         return Promise.resolve(promise).catch(function (error) {
+          if (isAbortError(error)) throw error;
           reportNonCriticalError(label, error);
           return fallbackValue;
         });
       }
 
-      async function fetchThingSpeakRange(startDate, endDate, maxPoints, progressCallback) {
+      async function fetchThingSpeakRange(startDate, endDate, maxPoints, progressCallback, signal) {
         if (!isValidDate(startDate) || !isValidDate(endDate) || !(startDate < endDate)) {
           if (progressCallback) progressCallback(0, 1, 'done', 0);
           return { x: [], y: [] };
@@ -1201,11 +1230,12 @@ Założenia i interpretacja działania:
         if (progressCallback) progressCallback(completedChunks, totalChunks, 'fetch', 0);
 
         while (chunkStart < endDate) {
+          throwIfAborted(signal);
           const chunkEnd = new Date(Math.min(chunkStart.getTime() + chunkMs, endDate.getTime()));
           let url = 'https://api.thingspeak.com/channels/' + CHANNEL_ID + '/fields/' + FIELD + '.json?start=' + encodeURIComponent(formatThingSpeakDateUTC(chunkStart)) + '&end=' + encodeURIComponent(formatThingSpeakDateUTC(chunkEnd)) + '&results=8000';
           if (READ_API_KEY && READ_API_KEY.length > 0) url += '&api_key=' + READ_API_KEY;
 
-          const data = await fetchJson(url, 'ThingSpeak');
+          const data = await fetchJson(url, 'ThingSpeak', signal);
           const feeds = data && data.feeds ? data.feeds : [];
 
           for (let i = 0; i < feeds.length; i++) {
@@ -1234,7 +1264,7 @@ Założenia i interpretacja działania:
         return result;
       }
 
-      async function fetchFullSensorDataset(force, progressCallback) {
+      async function fetchFullSensorDataset(force, progressCallback, signal) {
         const useForce = !!force;
         const nowMs = Date.now();
         const cacheIsFresh = fullSensorCacheData && (nowMs - fullSensorCacheTs < 5 * 60 * 1000);
@@ -1247,7 +1277,7 @@ Założenia i interpretacja działania:
         const now = new Date();
         const data = await fetchThingSpeakRange(defaultStart, now, FULL_SENSOR_MAX_POINTS, progressCallback ? function (done, total, phase, count) {
           progressCallback(done, total, false, phase, count);
-        } : null);
+        } : null, signal);
 
         fullSensorCacheData = data;
         fullSensorCacheTs = nowMs;
@@ -1274,10 +1304,10 @@ Założenia i interpretacja działania:
         }
       }
 
-      async function fetchLublinCurrent() {
+      async function fetchLublinCurrent(signal) {
         const geo = await getLublinGeo();
         const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + geo.latitude + '&longitude=' + geo.longitude + '&current=temperature_2m,relative_humidity_2m,pressure_msl&timezone=GMT';
-        const data = await fetchJson(url, 'Open-Meteo aktualne dane');
+        const data = await fetchJson(url, 'Open-Meteo aktualne dane', signal);
         const current = data && data.current ? data.current : {};
         const temp = Number(current.temperature_2m);
         const rh = Number(current.relative_humidity_2m);
@@ -1292,7 +1322,7 @@ Założenia i interpretacja działania:
         };
       }
 
-      async function fetchLublinHistory(startDate, endDate) {
+      async function fetchLublinHistory(startDate, endDate, signal) {
         const geo = await getLublinGeo();
         const now = new Date();
         const safeStart = startDate < new Date(now.getTime() - METEO_PAST_DAYS_LIMIT * DAY_MS)
@@ -1303,7 +1333,7 @@ Założenia i interpretacja działania:
         const pastDays = Math.max(1, Math.min(METEO_PAST_DAYS_LIMIT, requestedPastDays));
         const forecastDays = Math.max(1, Math.min(METEO_FORECAST_DAYS_LIMIT, requestedFutureDays));
         const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + geo.latitude + '&longitude=' + geo.longitude + '&hourly=temperature_2m,relative_humidity_2m,pressure_msl&past_days=' + pastDays + '&forecast_days=' + forecastDays + '&timezone=GMT';
-        const data = await fetchJson(url, 'Open-Meteo historia/prognoza godzinowa');
+        const data = await fetchJson(url, 'Open-Meteo historia/prognoza godzinowa', signal);
         const hourly = data && data.hourly ? data.hourly : {};
         const rawTimes = hourly.time || [];
         const temps = hourly.temperature_2m || [];
@@ -1340,7 +1370,7 @@ Założenia i interpretacja działania:
         return { x: filteredTime, temp: filteredTemp, rh: filteredRH, ah: filteredAH, pressure: filteredPressure, dewPoint: filteredDewPoint };
       }
 
-      async function fetchLublinModelLine(startDate, endDate) {
+      async function fetchLublinModelLine(startDate, endDate, signal) {
         const geo = await getLublinGeo();
         const now = new Date();
         const msBack = Math.max(0, now.getTime() - startDate.getTime());
@@ -1349,7 +1379,7 @@ Założenia i interpretacja działania:
         const daysForwardFromRange = Math.ceil(msForward / DAY_MS) + 1;
         const forecastDays = Math.max(FUTURE_FORECAST_DAYS, Math.min(METEO_FORECAST_DAYS_LIMIT, daysForwardFromRange));
         const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + geo.latitude + '&longitude=' + geo.longitude + '&hourly=temperature_2m&past_days=' + daysBack + '&forecast_days=' + forecastDays + '&timezone=GMT';
-        const data = await fetchJson(url, 'Open-Meteo linia modelu');
+        const data = await fetchJson(url, 'Open-Meteo linia modelu', signal);
         const hourly = data && data.hourly ? data.hourly : {};
         const rawTimes = hourly.time || [];
         const rawTemps = hourly.temperature_2m || [];
@@ -1366,7 +1396,7 @@ Założenia i interpretacja działania:
         return { x: x, temp: temp };
       }
 
-      async function fetchLublinSunDaily() {
+      async function fetchLublinSunDaily(signal) {
         const geo = await getLublinGeo();
         const today = new Date();
         const localDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -1375,7 +1405,7 @@ Założenia i interpretacja działania:
         const startDate = localDate.getFullYear() + '-' + pad(localDate.getMonth() + 1) + '-' + pad(localDate.getDate());
         const endDate = tomorrow.getFullYear() + '-' + pad(tomorrow.getMonth() + 1) + '-' + pad(tomorrow.getDate());
         const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + geo.latitude + '&longitude=' + geo.longitude + '&daily=sunrise,sunset&timezone=Europe/Warsaw&start_date=' + startDate + '&end_date=' + endDate;
-        const data = await fetchJson(url, 'Open-Meteo wschód/zachód słońca');
+        const data = await fetchJson(url, 'Open-Meteo wschód/zachód słońca', signal);
         const daily = data && data.daily ? data.daily : {};
         return { sunrise: daily.sunrise ? daily.sunrise[0] : null, sunset: daily.sunset ? daily.sunset[0] : null };
       }
@@ -2578,10 +2608,37 @@ Założenia i interpretacja działania:
         }
       }
 
-      function refreshDashboardFromCurrentSelection() {
+      function syncMainRangeSliderToRange(range) {
+        if (!range || !isValidDate(range.start) || !isValidDate(range.end) || !(range.start < range.end)) return;
+        const hours = Math.max(1, Math.ceil((range.end.getTime() - range.start.getTime()) / (60 * 60 * 1000)));
+        const currentMax = parseInt(el.hoursSlider.max, 10);
+        el.hoursSlider.max = String(Math.max(Number.isFinite(currentMax) ? currentMax : 720, hours));
+        el.hoursSlider.value = String(hours);
+        el.sliderHoursValue.textContent = formatHoursLabel(hours);
+        currentRangeHours = hours;
+        syncActiveRangeButtons();
+      }
+
+      function refreshDashboardFromCurrentSelection(options) {
+        const opts = options || {};
+        const cancelRunning = opts.cancelRunning !== false;
+
         if (!useCustomRange || customRangeEndFollowsNow) {
           el.endDate.value = toLocalInputValue(new Date());
         }
+
+        if (renderDashboardInProgress) {
+          if (cancelRunning && activeDashboardAbortController) {
+            renderDashboardRestartRequested = true;
+            setDebugInfo('Przerywanie trwającego pobierania; nowe polecenie zostanie wykonane po bezpiecznym zatrzymaniu poprzedniego.');
+            activeDashboardAbortController.abort();
+          } else {
+            renderDashboardQueued = true;
+            setDebugInfo('Odświeżanie jest już w toku; kolejne odświeżenie zostanie wykonane po zakończeniu obecnego.');
+          }
+          return;
+        }
+
         renderDashboard();
       }
 
@@ -2594,6 +2651,9 @@ Założenia i interpretacja działania:
 
         renderDashboardInProgress = true;
         renderDashboardQueued = false;
+        const dashboardAbortController = new AbortController();
+        activeDashboardAbortController = dashboardAbortController;
+        const signal = dashboardAbortController.signal;
 
         const fetchStart = performance.now();
         let overlay3dRenderMs = NaN;
@@ -2604,6 +2664,8 @@ Założenia i interpretacja działania:
 
         try {
           const range = getActiveRange();
+          syncMainRangeSliderToRange(range);
+          throwIfAborted(signal);
           let sensorCountLive = NaN;
           let meteoCountLive = NaN;
 
@@ -2616,16 +2678,16 @@ Założenia i interpretacja działania:
             else if (phase === 'processing') setProgress(44, 'Scalanie i filtrowanie danych sensora...');
             else if (phase === 'finalizing') setProgress(46, 'Redukcja liczby punktów sensora...');
             else if (phase === 'done') setProgress(48, 'Dane sensora gotowe.');
-          });
+          }, signal);
 
-          const lublinCurrentPromise = fallbackOnError(fetchLublinCurrent(), 'Aktualne dane meteo', null);
-          const lublinHistoryPromise = fallbackOnError(fetchLublinHistory(range.start, range.end).then(function (data) {
+          const lublinCurrentPromise = fallbackOnError(fetchLublinCurrent(signal), 'Aktualne dane meteo', null);
+          const lublinHistoryPromise = fallbackOnError(fetchLublinHistory(range.start, range.end, signal).then(function (data) {
             meteoCountLive = data.temp.length;
             setProgressCounts(sensorCountLive, meteoCountLive);
             return data;
           }), 'Historia/prognoza meteo', createEmptyLublinHistory());
-          const lublinModelPromise = fallbackOnError(fetchLublinModelLine(range.start, range.end), 'Linia modelu meteo', { x: [], temp: [] });
-          const sunDailyPromise = fallbackOnError(fetchLublinSunDaily(), 'Wschód i zachód słońca', { sunrise: null, sunset: null });
+          const lublinModelPromise = fallbackOnError(fetchLublinModelLine(range.start, range.end, signal), 'Linia modelu meteo', { x: [], temp: [] });
+          const sunDailyPromise = fallbackOnError(fetchLublinSunDaily(signal), 'Wschód i zachód słońca', { sunrise: null, sunset: null });
           const fullSensorPromise = defaultStartFullRangeEnabled
             ? fallbackOnError(fetchFullSensorDataset(false, function (done, total, fromCache, phase, count) {
                 if (fromCache) { setProgress(74, 'Pełny zbiór sensora z pamięci podręcznej'); return; }
@@ -2633,7 +2695,7 @@ Założenia i interpretacja działania:
                 else if (phase === 'processing') setProgress(72, 'Scalanie i filtrowanie pełnego zbioru sensora...');
                 else if (phase === 'finalizing') setProgress(76, 'Redukcja liczby punktów pełnego zbioru sensora...');
                 else if (phase === 'done') setProgress(78, 'Pełny zbiór sensora gotowy (' + (count || 0) + ' próbek).');
-                            }), 'Pełny zbiór sensora', null)
+              }, signal), 'Pełny zbiór sensora', null)
             : Promise.resolve(null);
 
           const results = await Promise.all([sensorPromise, lublinCurrentPromise, lublinHistoryPromise, lublinModelPromise, sunDailyPromise, fullSensorPromise]);
@@ -2721,6 +2783,12 @@ Założenia i interpretacja działania:
           setProgressTimes(fetchMs, overlay3dRenderMs);
           el.status.textContent = 'OK | od ' + formatDateTime(range.start) + ' do ' + formatDateTime(range.end) + ' | S: ' + sensorData.y.length + ' | L: ' + lublinHistory.temp.length;
         } catch (error) {
+          if (isAbortError(error)) {
+            console.info('Poprzednie pobieranie zostało przerwane przez nowe polecenie.');
+            setProgress(100, 'Przerwano poprzednie pobieranie. Uruchamianie nowego polecenia...');
+            return;
+          }
+
           console.error(error);
           setProgress(100, 'Błąd pobierania danych.');
           setProgressTimes(performance.now() - fetchStart, overlay3dRenderMs);
@@ -2732,10 +2800,17 @@ Założenia i interpretacja działania:
           el.sensorMeteoSurface3dInfo.textContent = 'Nie udało się odświeżyć powierzchni 3D sensor + meteo.';
           el.meteoOverlay3dInfo.textContent = 'Nie udało się odświeżyć overlay 3D meteo.';
         } finally {
+          if (activeDashboardAbortController === dashboardAbortController) {
+            activeDashboardAbortController = null;
+          }
           renderDashboardInProgress = false;
-          if (renderDashboardQueued) {
+          if (renderDashboardRestartRequested) {
+            renderDashboardRestartRequested = false;
             renderDashboardQueued = false;
-            refreshDashboardFromCurrentSelection();
+            refreshDashboardFromCurrentSelection({ cancelRunning: false });
+          } else if (renderDashboardQueued) {
+            renderDashboardQueued = false;
+            refreshDashboardFromCurrentSelection({ cancelRunning: false });
           }
         }
       }
@@ -2744,7 +2819,9 @@ Założenia i interpretacja działania:
         if (refreshTimer) clearInterval(refreshTimer);
         if (!el.autoToggle.checked) return;
         const intervalSec = parseInt(el.intervalSelect.value, 10);
-        refreshTimer = setInterval(refreshDashboardFromCurrentSelection, intervalSec * 1000);
+        refreshTimer = setInterval(function () {
+          refreshDashboardFromCurrentSelection({ cancelRunning: false });
+        }, intervalSec * 1000);
       }
 
       function syncActiveRangeButtons() {
