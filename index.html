@@ -14,6 +14,8 @@ Cel:
 Użycie:
 - Podmień aktualny plik index.html w repozytorium GitHub Pages.
 - Otwórz stronę w przeglądarce.
+- Po uruchomieniu strona ładuje ostatnie 5 dni danych.
+- Domyślna data początkowa 29.03.2026 jest wpisana w polu „Od”, ale pełny zakres od tej daty ładuje się dopiero po kliknięciu przycisku „Załaduj od 29.03.2026”.
 - Ustaw zakres czasu szybkimi przyciskami, suwakiem albo polami od-do.
 - Dodatkowe suwaki 3D sterują liczbą dni w overlayach.
 Uruchomienie:
@@ -47,7 +49,8 @@ Założenia i interpretacja działania:
 - Open-Meteo dla danych godzinowych jest pobierane w GMT, aby było zgodne z UTC z ThingSpeak.
 - Widok wykresów ma być możliwie stabilny i czytelny również na telefonie.
 - Strona ma nie przesuwać się poziomo przy przypadkowym skalowaniu.
-- Dane 3D są przygotowywane od razu po pobraniu, aby zmiana projekcji i kropek była natychmiastowa.
+- Dane 3D są przygotowywane od razu po pobraniu, aby zmiana projekcji była natychmiastowa.
+- Przy pierwszym uruchomieniu pobierany jest zakres 5 dni, aby strona startowała szybciej; pełny zakres od 29.03.2026 wymaga osobnego kliknięcia.
 -->
 <!DOCTYPE html>
 <html lang="pl">
@@ -296,10 +299,11 @@ Założenia i interpretacja działania:
           <button class="btn" data-hours="1">1 h</button>
           <button class="btn" data-hours="3">3 h</button>
           <button class="btn" data-hours="6">6 h</button>
-          <button class="btn active" data-hours="8">8 h</button>
+          <button class="btn" data-hours="8">8 h</button>
           <button class="btn" data-hours="12">12 h</button>
           <button class="btn" data-hours="24">24 h</button>
           <button class="btn" data-hours="72">3 dni</button>
+          <button class="btn active" data-hours="120">5 dni</button>
           <button class="btn" data-hours="168">7 dni</button>
         </div>
         <div class="row-right">
@@ -318,9 +322,9 @@ Założenia i interpretacja działania:
       <div class="slider-wrap">
         <div class="slider-head">
           <div>Zakres czasu suwakiem</div>
-          <div id="sliderHoursValue">8 h (0.33 dni)</div>
+          <div id="sliderHoursValue">120 h (5.00 dni)</div>
         </div>
-        <input id="hoursSlider" class="range-slider" type="range" min="1" max="720" step="1" value="8" />
+        <input id="hoursSlider" class="range-slider" type="range" min="1" max="720" step="1" value="120" />
       </div>
 
       <div class="row">
@@ -330,6 +334,7 @@ Założenia i interpretacja działania:
           <label for="endDate">Do:</label>
           <input id="endDate" class="dt-input" type="datetime-local" />
           <button id="applyRangeBtn" class="btn">Zastosuj okres</button>
+          <button id="loadDefaultStartBtn" class="btn">Załaduj od 29.03.2026</button>
           <button id="resetRangeBtn" class="btn">Wróć do szybkiego zakresu</button>
         </div>
       </div>
@@ -362,7 +367,9 @@ Założenia i interpretacja działania:
           </select>
           <button class="btn" data-3d-chart="sensorOverlay3dChart" data-3d-legend="toggle">Ukryj legendę</button>
           <button class="btn" data-3d-chart="sensorOverlay3dChart" data-3d-view="xz">Widok X-Z</button>
+          <button class="btn" data-3d-chart="sensorOverlay3dChart" data-3d-view="xzBack">X-Z z drugiej strony</button>
           <button class="btn" data-3d-chart="sensorOverlay3dChart" data-3d-view="yz">Widok Y-Z</button>
+          <button class="btn" data-3d-chart="sensorOverlay3dChart" data-3d-view="yzBack">Y-Z z drugiej strony</button>
         </div>
       </div>
       <div class="plot-frame"><div id="sensorOverlay3dChart"></div></div>
@@ -386,7 +393,9 @@ Założenia i interpretacja działania:
           </select>
           <button class="btn" data-3d-chart="sensorMeteoOverlay3dChart" data-3d-legend="toggle">Ukryj legendę</button>
           <button class="btn" data-3d-chart="sensorMeteoOverlay3dChart" data-3d-view="xz">Widok X-Z</button>
+          <button class="btn" data-3d-chart="sensorMeteoOverlay3dChart" data-3d-view="xzBack">X-Z z drugiej strony</button>
           <button class="btn" data-3d-chart="sensorMeteoOverlay3dChart" data-3d-view="yz">Widok Y-Z</button>
+          <button class="btn" data-3d-chart="sensorMeteoOverlay3dChart" data-3d-view="yzBack">Y-Z z drugiej strony</button>
         </div>
       </div>
       <div class="plot-frame"><div id="sensorMeteoOverlay3dChart"></div></div>
@@ -469,7 +478,9 @@ Założenia i interpretacja działania:
         <div class="overlay-controls">
           <button class="btn" data-3d-chart="mollier3dChart" data-3d-legend="toggle">Ukryj legendę</button>
           <button class="btn" data-3d-chart="mollier3dChart" data-3d-view="xz">Widok X-Z</button>
+          <button class="btn" data-3d-chart="mollier3dChart" data-3d-view="xzBack">X-Z z drugiej strony</button>
           <button class="btn" data-3d-chart="mollier3dChart" data-3d-view="yz">Widok Y-Z</button>
+          <button class="btn" data-3d-chart="mollier3dChart" data-3d-view="yzBack">Y-Z z drugiej strony</button>
         </div>
       </div>
       <div class="plot-frame"><div id="mollier3dChart"></div></div>
@@ -490,7 +501,9 @@ Założenia i interpretacja działania:
           </select>
           <button class="btn" data-3d-chart="sensorOverlay3dFullChart" data-3d-legend="toggle">Ukryj legendę</button>
           <button class="btn" data-3d-chart="sensorOverlay3dFullChart" data-3d-view="xz">Widok X-Z</button>
+          <button class="btn" data-3d-chart="sensorOverlay3dFullChart" data-3d-view="xzBack">X-Z z drugiej strony</button>
           <button class="btn" data-3d-chart="sensorOverlay3dFullChart" data-3d-view="yz">Widok Y-Z</button>
+          <button class="btn" data-3d-chart="sensorOverlay3dFullChart" data-3d-view="yzBack">Y-Z z drugiej strony</button>
         </div>
       </div>
       <div class="plot-frame"><div id="sensorOverlay3dFullChart"></div></div>
@@ -511,7 +524,9 @@ Założenia i interpretacja działania:
           </select>
           <button class="btn" data-3d-chart="meteoOverlay3dChart" data-3d-legend="toggle">Ukryj legendę</button>
           <button class="btn" data-3d-chart="meteoOverlay3dChart" data-3d-view="xz">Widok X-Z</button>
+          <button class="btn" data-3d-chart="meteoOverlay3dChart" data-3d-view="xzBack">X-Z z drugiej strony</button>
           <button class="btn" data-3d-chart="meteoOverlay3dChart" data-3d-view="yz">Widok Y-Z</button>
+          <button class="btn" data-3d-chart="meteoOverlay3dChart" data-3d-view="yzBack">Y-Z z drugiej strony</button>
         </div>
       </div>
       <div class="plot-frame"><div id="meteoOverlay3dChart"></div></div>
@@ -535,7 +550,9 @@ Założenia i interpretacja działania:
           </select>
           <button class="btn" data-3d-chart="sensorMeteoSurface3dChart" data-3d-legend="toggle">Ukryj legendę</button>
           <button class="btn" data-3d-chart="sensorMeteoSurface3dChart" data-3d-view="xz">Widok X-Z</button>
+          <button class="btn" data-3d-chart="sensorMeteoSurface3dChart" data-3d-view="xzBack">X-Z z drugiej strony</button>
           <button class="btn" data-3d-chart="sensorMeteoSurface3dChart" data-3d-view="yz">Widok Y-Z</button>
+          <button class="btn" data-3d-chart="sensorMeteoSurface3dChart" data-3d-view="yzBack">Y-Z z drugiej strony</button>
         </div>
       </div>
       <div class="plot-frame"><div id="sensorMeteoSurface3dChart"></div></div>
@@ -592,7 +609,7 @@ Założenia i interpretacja działania:
         console.error('Nieobsłużony błąd asynchroniczny:', event.reason);
       });
 
-      let currentRangeHours = 8;
+      let currentRangeHours = 120;
       let useCustomRange = false;
       let refreshTimer = null;
       let lublinGeo = null;
@@ -600,6 +617,9 @@ Założenia i interpretacja działania:
       let progressVisibleValue = 0;
       let renderDashboardInProgress = false;
       let renderDashboardQueued = false;
+      let customRangeEndFollowsNow = false;
+      let defaultStartFullRangeEnabled = false;
+      let forceMaxOverlaySlidersOnNextRender = false;
 
       let sensor3dOverlayDays = 3;
       let sensorAvailableDaysMax = 1;
@@ -683,6 +703,7 @@ Założenia i interpretacja działania:
         startDate: byId('startDate'),
         endDate: byId('endDate'),
         applyRangeBtn: byId('applyRangeBtn'),
+        loadDefaultStartBtn: byId('loadDefaultStartBtn'),
         resetRangeBtn: byId('resetRangeBtn'),
         currentTemp: byId('currentTemp'),
         lastTime: byId('lastTime'),
@@ -1413,10 +1434,28 @@ Założenia i interpretacja działania:
           };
         }
 
+        if (view === 'xzBack') {
+          return {
+            projection: projection,
+            eye: { x: 0, y: -2.35, z: 0.001 },
+            center: { x: 0, y: 0, z: 0 },
+            up: { x: 0, y: 0, z: 1 }
+          };
+        }
+
         if (view === 'yz') {
           return {
             projection: projection,
             eye: { x: 2.35, y: 0, z: 0.001 },
+            center: { x: 0, y: 0, z: 0 },
+            up: { x: 0, y: 0, z: 1 }
+          };
+        }
+
+        if (view === 'yzBack') {
+          return {
+            projection: projection,
+            eye: { x: -2.35, y: 0, z: 0.001 },
             center: { x: 0, y: 0, z: 0 },
             up: { x: 0, y: 0, z: 1 }
           };
@@ -2105,7 +2144,7 @@ Założenia i interpretacja działania:
       function updateSensorOverlayAvailabilityFromData(sensorData) {
         const uniqueDays = new Set(sensorData.x.map(function (d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }));
         sensorAvailableDaysMax = Math.max(1, uniqueDays.size);
-        if (sensor3dOverlayAutoMaxPending) {
+        if (forceMaxOverlaySlidersOnNextRender || sensor3dOverlayAutoMaxPending) {
           sensor3dOverlayDays = sensorAvailableDaysMax;
           sensor3dOverlayAutoMaxPending = false;
         } else {
@@ -2130,7 +2169,7 @@ Założenia i interpretacja działania:
       function updateSensorMeteoOverlayAvailabilityFromData(combinedPrepared) {
         const count = combinedPrepared && combinedPrepared.dayKeys ? combinedPrepared.dayKeys.length : 0;
         sensorMeteoAvailableDaysMax = Math.max(1, count);
-        if (sensorMeteo3dOverlayAutoMaxPending) {
+        if (forceMaxOverlaySlidersOnNextRender || sensorMeteo3dOverlayAutoMaxPending) {
           sensorMeteo3dOverlayDays = sensorMeteoAvailableDaysMax;
           sensorMeteo3dOverlayAutoMaxPending = false;
         } else {
@@ -2145,7 +2184,7 @@ Założenia i interpretacja działania:
       function updateSensorMeteoSurfaceAvailabilityFromData(combinedPrepared) {
         const count = combinedPrepared && combinedPrepared.dayKeys ? combinedPrepared.dayKeys.length : 0;
         sensorMeteoSurfaceAvailableDaysMax = Math.max(1, count);
-        if (sensorMeteoSurface3dOverlayAutoMaxPending) {
+        if (forceMaxOverlaySlidersOnNextRender || sensorMeteoSurface3dOverlayAutoMaxPending) {
           sensorMeteoSurface3dOverlayDays = sensorMeteoSurfaceAvailableDaysMax;
           sensorMeteoSurface3dOverlayAutoMaxPending = false;
         } else {
@@ -2160,7 +2199,7 @@ Założenia i interpretacja działania:
       function updateMeteoOverlayAvailabilityFromData(lublinHistory) {
         const uniqueDays = new Set(lublinHistory.x.map(function (d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }));
         meteoAvailableDaysMax = Math.max(1, uniqueDays.size);
-        if (meteo3dOverlayAutoMaxPending) {
+        if (forceMaxOverlaySlidersOnNextRender || meteo3dOverlayAutoMaxPending) {
           meteo3dOverlayDays = meteoAvailableDaysMax;
           meteo3dOverlayAutoMaxPending = false;
         } else {
@@ -2245,6 +2284,13 @@ Założenia i interpretacja działania:
         }
       }
 
+      function refreshDashboardFromCurrentSelection() {
+        if (!useCustomRange || customRangeEndFollowsNow) {
+          el.endDate.value = toLocalInputValue(new Date());
+        }
+        renderDashboard();
+      }
+
       async function renderDashboard() {
         if (renderDashboardInProgress) {
           renderDashboardQueued = true;
@@ -2286,13 +2332,15 @@ Założenia i interpretacja działania:
           });
           const lublinModelPromise = fetchLublinModelLine(range.start, range.end);
           const sunDailyPromise = fetchLublinSunDaily();
-          const fullSensorPromise = fetchFullSensorDataset(false, function (done, total, fromCache, phase, count) {
-            if (fromCache) { setProgress(74, 'Pełny zbiór sensora z pamięci podręcznej'); return; }
-            if (phase === 'fetch') setProgress(50 + (done / Math.max(total, 1)) * 20, 'Pobieranie pełnego zbioru sensora: ' + done + '/' + total + ' partii');
-            else if (phase === 'processing') setProgress(72, 'Scalanie i filtrowanie pełnego zbioru sensora...');
-            else if (phase === 'finalizing') setProgress(76, 'Redukcja liczby punktów pełnego zbioru sensora...');
-            else if (phase === 'done') setProgress(78, 'Pełny zbiór sensora gotowy (' + (count || 0) + ' próbek).');
-          });
+          const fullSensorPromise = defaultStartFullRangeEnabled
+            ? fetchFullSensorDataset(false, function (done, total, fromCache, phase, count) {
+                if (fromCache) { setProgress(74, 'Pełny zbiór sensora z pamięci podręcznej'); return; }
+                if (phase === 'fetch') setProgress(50 + (done / Math.max(total, 1)) * 20, 'Pobieranie pełnego zbioru sensora: ' + done + '/' + total + ' partii');
+                else if (phase === 'processing') setProgress(72, 'Scalanie i filtrowanie pełnego zbioru sensora...');
+                else if (phase === 'finalizing') setProgress(76, 'Redukcja liczby punktów pełnego zbioru sensora...');
+                else if (phase === 'done') setProgress(78, 'Pełny zbiór sensora gotowy (' + (count || 0) + ' próbek).');
+              })
+            : Promise.resolve(null);
 
           const results = await Promise.all([sensorPromise, lublinCurrentPromise, lublinHistoryPromise, lublinModelPromise, sunDailyPromise, fullSensorPromise]);
           const sensorData = results[0];
@@ -2300,7 +2348,7 @@ Założenia i interpretacja działania:
           const lublinHistory = results[2];
           const lublinModel = results[3];
           const sunDaily = results[4];
-          const fullSensorData = results[5];
+          const fullSensorData = results[5] || sensorData;
 
           const fetchMs = performance.now() - fetchStart;
           setProgress(80, 'Dane pobrane. Przygotowanie wykresów...');
@@ -2308,8 +2356,10 @@ Założenia i interpretacja działania:
 
           lastCurrentSensorData = sensorData;
           lastCurrentLublinData = lublinHistory;
-          fullSensorCacheData = fullSensorData;
-          fullSensorCacheTs = Date.now();
+          if (defaultStartFullRangeEnabled) {
+            fullSensorCacheData = fullSensorData;
+            fullSensorCacheTs = Date.now();
+          }
 
           currentSensorPrepared3D = prepareOverlay3DData(sensorData, 'Sensor');
           currentMeteoPrepared3D = prepareOverlay3DData({ x: lublinHistory.x, y: lublinHistory.temp }, 'Meteo');
@@ -2322,6 +2372,7 @@ Założenia i interpretacja działania:
           updateSensorMeteoSurfaceAvailabilityFromData(currentSensorMeteoPrepared3D);
           updateMeteoOverlayAvailabilityFromData(lublinHistory);
           updateOverlayCompareAvailability(sensorData, lublinHistory);
+          forceMaxOverlaySlidersOnNextRender = false;
           setProgressCounts(sensorData.y.length, lublinHistory.temp.length);
           updateAnalysisPanel(sensorData, lublinHistory, lublinCurrent, sunDaily);
 
@@ -2389,7 +2440,7 @@ Założenia i interpretacja działania:
           renderDashboardInProgress = false;
           if (renderDashboardQueued) {
             renderDashboardQueued = false;
-            renderDashboard();
+            refreshDashboardFromCurrentSelection();
           }
         }
       }
@@ -2398,7 +2449,7 @@ Założenia i interpretacja działania:
         if (refreshTimer) clearInterval(refreshTimer);
         if (!el.autoToggle.checked) return;
         const intervalSec = parseInt(el.intervalSelect.value, 10);
-        refreshTimer = setInterval(renderDashboard, intervalSec * 1000);
+        refreshTimer = setInterval(refreshDashboardFromCurrentSelection, intervalSec * 1000);
       }
 
       function syncActiveRangeButtons() {
@@ -2416,17 +2467,34 @@ Założenia i interpretacja działania:
       function applyQuickRange(hours) {
         chartUiRevision += 1;
         useCustomRange = false;
+        customRangeEndFollowsNow = false;
+        defaultStartFullRangeEnabled = false;
         currentRangeHours = hours;
         syncActiveRangeButtons();
         syncSliderLabel();
         const range = getActiveRange();
-        el.startDate.value = toLocalInputValue(range.start);
         el.endDate.value = toLocalInputValue(range.end);
-        renderDashboard();
+        refreshDashboardFromCurrentSelection();
+      }
+
+      function applyDefaultStartRange() {
+        const defaultStart = new Date(DEFAULT_START_DATE_STR);
+        const now = new Date();
+        chartUiRevision += 1;
+        useCustomRange = true;
+        customRangeEndFollowsNow = true;
+        defaultStartFullRangeEnabled = true;
+        forceMaxOverlaySlidersOnNextRender = true;
+        el.startDate.value = toLocalInputValue(defaultStart);
+        el.endDate.value = toLocalInputValue(now);
+        syncActiveRangeButtons();
+        refreshDashboardFromCurrentSelection();
       }
 
       function runSelfTests() {
         console.assert(formatHoursLabel(24) === '24 h (1.00 dni)', 'Test formatHoursLabel nie przeszedł.');
+        console.assert(DEFAULT_START_DATE_STR === '2026-03-29T00:00', 'Test domyślnej daty początkowej nie przeszedł.');
+        console.assert(currentRangeHours === 120, 'Test domyślnego zakresu 5 dni nie przeszedł.');
         const r = computePaddedYRange([1, 2, null, NaN, 'x']);
         console.assert(Array.isArray(r) && r.length === 2 && r[0] < 1 && r[1] > 2, 'Test computePaddedYRange nie przeszedł.');
         const stats = calculateStats([null, 1, 3, NaN]);
@@ -2442,6 +2510,12 @@ Założenia i interpretacja działania:
         sceneViewState.sensorOverlay3dChart = 'xz';
         const cameraTest = getCameraFor3DView('sensorOverlay3dChart', 'orthographic');
         console.assert(cameraTest.eye.y > 2 && cameraTest.up.z === 1 && cameraTest.projection.type === 'orthographic', 'Test getCameraFor3DView dla X-Z nie przeszedł.');
+        sceneViewState.sensorOverlay3dChart = 'xzBack';
+        const cameraBackTest = getCameraFor3DView('sensorOverlay3dChart', 'orthographic');
+        console.assert(cameraBackTest.eye.y < -2 && cameraBackTest.up.z === 1 && cameraBackTest.projection.type === 'orthographic', 'Test getCameraFor3DView dla X-Z z drugiej strony nie przeszedł.');
+        sceneViewState.sensorOverlay3dChart = 'yzBack';
+        const cameraYzBackTest = getCameraFor3DView('sensorOverlay3dChart', 'perspective');
+        console.assert(cameraYzBackTest.eye.x < -2 && cameraYzBackTest.up.z === 1 && cameraYzBackTest.projection.type === 'perspective', 'Test getCameraFor3DView dla Y-Z z drugiej strony nie przeszedł.');
         sceneViewState.sensorOverlay3dChart = previousSceneView;
         setProjectionState('sensorOverlay3dChart', previousProjection);
         const combinedPrepared = prepareCombinedOverlay3DData(
@@ -2502,15 +2576,18 @@ Założenia i interpretacja działania:
             return;
           }
           useCustomRange = true;
+          customRangeEndFollowsNow = false;
+          defaultStartFullRangeEnabled = false;
           syncActiveRangeButtons();
           chartUiRevision += 1;
           renderDashboard();
         });
 
+        el.loadDefaultStartBtn.addEventListener('click', applyDefaultStartRange);
         el.resetRangeBtn.addEventListener('click', function () { applyQuickRange(currentRangeHours); });
         el.autoToggle.addEventListener('change', restartTimer);
         el.intervalSelect.addEventListener('change', restartTimer);
-        el.refreshBtn.addEventListener('click', function () { chartUiRevision += 1; renderDashboard(); });
+        el.refreshBtn.addEventListener('click', refreshDashboardFromCurrentSelection);
 
         el.overlayDaysSlider.addEventListener('input', function () {
           overlayCompareDays = parseInt(el.overlayDaysSlider.value, 10);
@@ -2630,14 +2707,16 @@ Założenia i interpretacja działania:
         bindUi();
         const now = new Date();
         const defaultStart = new Date(DEFAULT_START_DATE_STR);
-        useCustomRange = true;
+        useCustomRange = false;
+        customRangeEndFollowsNow = false;
+        defaultStartFullRangeEnabled = false;
+        currentRangeHours = 120;
         el.startDate.value = toLocalInputValue(defaultStart);
         el.endDate.value = toLocalInputValue(now);
-        const totalHours = Math.max(1, Math.ceil((now.getTime() - defaultStart.getTime()) / (60 * 60 * 1000)));
-        currentRangeHours = totalHours;
-        el.hoursSlider.max = String(Math.max(720, totalHours));
-        el.hoursSlider.value = String(totalHours);
-        el.sliderHoursValue.textContent = formatHoursLabel(totalHours);
+        const totalHoursFromDefaultStart = Math.max(1, Math.ceil((now.getTime() - defaultStart.getTime()) / (60 * 60 * 1000)));
+        el.hoursSlider.max = String(Math.max(720, totalHoursFromDefaultStart));
+        el.hoursSlider.value = String(currentRangeHours);
+        el.sliderHoursValue.textContent = formatHoursLabel(currentRangeHours);
         syncActiveRangeButtons();
         sensor3dOverlayAutoMaxPending = true;
         sensorMeteo3dOverlayAutoMaxPending = true;
