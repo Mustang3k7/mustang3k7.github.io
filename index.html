@@ -160,6 +160,43 @@ Założenia i interpretacja działania:
       color: white;
     }
 
+    .quick-range-btn {
+      min-width: auto;
+      width: auto;
+      padding: 7px 8px;
+      display: inline-grid;
+      grid-template-rows: auto auto;
+      justify-items: center;
+      align-items: center;
+      gap: 2px;
+      line-height: 1.05;
+      white-space: nowrap;
+    }
+
+    .quick-range-btn span:first-child {
+      font-weight: 700;
+      min-width: 1.7em;
+      text-align: center;
+    }
+
+    .quick-range-btn span:last-child {
+      min-width: 1.9em;
+      text-align: center;
+      font-size: 12px;
+      color: inherit;
+      opacity: 0.9;
+    }
+
+    .timer-toggle-wrap {
+      min-width: 170px;
+      justify-content: center;
+    }
+
+    #sliderHoursValue {
+      min-width: 128px;
+      text-align: right;
+    }
+
     .btn-big {
       width: 100%;
       min-height: 54px;
@@ -548,21 +585,22 @@ Założenia i interpretacja działania:
     <section class="card top-controls">
       <div class="row">
         <div class="row-left">
-          <button class="btn" data-hours="1">1 h</button>
-          <button class="btn" data-hours="3">3 h</button>
-          <button class="btn" data-hours="6">6 h</button>
-          <button class="btn" data-hours="8">8 h</button>
-          <button class="btn" data-hours="12">12 h</button>
-          <button class="btn" data-hours="24">24 h</button>
-          <button class="btn" data-hours="72">3 dni</button>
-          <button class="btn active" data-hours="120">5 dni</button>
-          <button class="btn" data-hours="168">7 dni</button>
-          <button class="btn" data-hours="240">10 dni</button>
-          <button class="btn" data-hours="336">14 dni</button>
-          <button class="btn" data-hours="504">21 dni</button>
+          <button class="btn quick-range-btn" data-hours="1"><span>1</span><span>h</span></button>
+          <button class="btn quick-range-btn" data-hours="3"><span>3</span><span>h</span></button>
+          <button class="btn quick-range-btn" data-hours="6"><span>6</span><span>h</span></button>
+          <button class="btn quick-range-btn" data-hours="8"><span>8</span><span>h</span></button>
+          <button class="btn quick-range-btn" data-hours="12"><span>12</span><span>h</span></button>
+          <button class="btn quick-range-btn" data-hours="24"><span>24</span><span>h</span></button>
+          <button class="btn quick-range-btn" data-hours="72"><span>3</span><span>dni</span></button>
+          <button class="btn quick-range-btn active" data-hours="120"><span>5</span><span>dni</span></button>
+          <button class="btn quick-range-btn" data-hours="168"><span>7</span><span>dni</span></button>
+          <button class="btn quick-range-btn" data-hours="240"><span>10</span><span>dni</span></button>
+          <button class="btn quick-range-btn" data-hours="336"><span>14</span><span>dni</span></button>
+          <button class="btn quick-range-btn" data-hours="504"><span>21</span><span>dni</span></button>
         </div>
         <div class="row-right">
           <label class="toggle-wrap"><span>AUTO</span><input id="autoToggle" type="checkbox" /></label>
+          <label class="toggle-wrap timer-toggle-wrap"><span>Wstążka z timerem</span><input id="autoTimerShowToggle" type="checkbox" /></label>
           <select id="intervalSelect" class="select">
             <option value="10">10 s</option>
             <option value="20" selected>20 s</option>
@@ -847,7 +885,7 @@ Założenia i interpretacja działania:
         </label>
         <button id="autoRefreshNowBtn" class="btn" type="button">Odśwież teraz</button>
         <button id="autoResetBtn" class="btn" type="button">Reset licznika</button>
-        <button id="autoDisableBtn" class="btn" type="button">Wyłącz AUTO</button>
+        <button id="autoDisableBtn" class="btn" type="button">Włącz AUTO</button>
       </div>
     </div>
 
@@ -909,6 +947,7 @@ Założenia i interpretacja działania:
       let autoPausedRemainingMs = null;
       let autoRefreshPaused = false;
       let autoTimerExpanded = false;
+      let autoTimerVisible = false;
       let lublinGeo = null;
       let lublinGeoPromise = null;
       let chartUiRevision = 0;
@@ -996,6 +1035,7 @@ Założenia i interpretacja działania:
         status: byId('status'),
         autoToggle: byId('autoToggle'),
         intervalSelect: byId('intervalSelect'),
+        autoTimerShowToggle: byId('autoTimerShowToggle'),
         autoTimerBox: byId('autoTimerBox'),
         autoTimerValue: byId('autoTimerValue'),
         autoTimerState: byId('autoTimerState'),
@@ -1566,7 +1606,9 @@ Założenia i interpretacja działania:
       }
 
       async function fetchLublinCurrent(signal) {
+        throwIfAborted(signal);
         const geo = await getLublinGeo();
+        throwIfAborted(signal);
         const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + geo.latitude + '&longitude=' + geo.longitude + '&current=temperature_2m,relative_humidity_2m,pressure_msl&timezone=GMT';
         const data = await fetchJson(url, 'Open-Meteo aktualne dane', signal);
         const current = data && data.current ? data.current : {};
@@ -1584,7 +1626,9 @@ Założenia i interpretacja działania:
       }
 
       async function fetchLublinHistory(startDate, endDate, signal) {
+        throwIfAborted(signal);
         const geo = await getLublinGeo();
+        throwIfAborted(signal);
         const now = new Date();
         const safeStart = startDate < new Date(now.getTime() - METEO_PAST_DAYS_LIMIT * DAY_MS)
           ? new Date(now.getTime() - METEO_PAST_DAYS_LIMIT * DAY_MS)
@@ -1632,7 +1676,9 @@ Założenia i interpretacja działania:
       }
 
       async function fetchLublinModelLine(startDate, endDate, signal) {
+        throwIfAborted(signal);
         const geo = await getLublinGeo();
+        throwIfAborted(signal);
         const now = new Date();
         const msBack = Math.max(0, now.getTime() - startDate.getTime());
         const daysBack = Math.max(1, Math.min(METEO_PAST_DAYS_LIMIT, Math.ceil(msBack / DAY_MS) + 1));
@@ -1658,7 +1704,9 @@ Założenia i interpretacja działania:
       }
 
       async function fetchLublinSunDaily(signal) {
+        throwIfAborted(signal);
         const geo = await getLublinGeo();
+        throwIfAborted(signal);
         const today = new Date();
         const localDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
         const tomorrow = new Date(localDate.getTime() + 24 * 60 * 60 * 1000);
@@ -1811,7 +1859,7 @@ Założenia i interpretacja działania:
       }
 
       function getLegendVisible(chartId) {
-        return legendVisibleState.hasOwnProperty(chartId) ? legendVisibleState[chartId] : true;
+        return Object.prototype.hasOwnProperty.call(legendVisibleState, chartId) ? legendVisibleState[chartId] : true;
       }
 
       function updateLegendButtonText(button, chartId) {
@@ -2949,15 +2997,29 @@ Założenia i interpretacja działania:
           }), 'Historia/prognoza meteo', createEmptyLublinHistory());
           const lublinModelPromise = fallbackOnError(fetchLublinModelLine(range.start, range.end, signal), 'Linia modelu meteo', { x: [], temp: [] });
           const sunDailyPromise = fallbackOnError(fetchLublinSunDaily(signal), 'Wschód i zachód słońca', { sunrise: null, sunset: null });
-          const fullSensorPromise = defaultStartFullRangeEnabled
-            ? fallbackOnError(fetchFullSensorDataset(false, function (done, total, fromCache, phase, count) {
-                if (fromCache) { setProgress(74, 'Pełny zbiór sensora z pamięci podręcznej'); return; }
-                if (phase === 'fetch') setProgress(50 + (done / Math.max(total, 1)) * 20, 'Pobieranie pełnego zbioru sensora: ' + done + '/' + total + ' partii');
-                else if (phase === 'processing') setProgress(72, 'Scalanie i filtrowanie pełnego zbioru sensora...');
-                else if (phase === 'finalizing') setProgress(76, 'Redukcja liczby punktów pełnego zbioru sensora...');
-                else if (phase === 'done') setProgress(78, 'Pełny zbiór sensora gotowy (' + (count || 0) + ' próbek).');
-              }, signal), 'Pełny zbiór sensora', null)
-            : Promise.resolve(null);
+          let fullSensorPromise = Promise.resolve(null);
+          if (defaultStartFullRangeEnabled) {
+            const fullSensorProgress = function (done, total, fromCache, phase, count) {
+              if (fromCache) {
+                setProgress(74, 'Pełny zbiór sensora z pamięci podręcznej');
+                return;
+              }
+              if (phase === 'fetch') {
+                setProgress(50 + (done / Math.max(total, 1)) * 20, 'Pobieranie pełnego zbioru sensora: ' + done + '/' + total + ' partii');
+              } else if (phase === 'processing') {
+                setProgress(72, 'Scalanie i filtrowanie pełnego zbioru sensora...');
+              } else if (phase === 'finalizing') {
+                setProgress(76, 'Redukcja liczby punktów pełnego zbioru sensora...');
+              } else if (phase === 'done') {
+                setProgress(78, 'Pełny zbiór sensora gotowy (' + (count || 0) + ' próbek).');
+              }
+            };
+            fullSensorPromise = fallbackOnError(
+              fetchFullSensorDataset(false, fullSensorProgress, signal),
+              'Pełny zbiór sensora',
+              null
+            );
+          }
 
           const results = await Promise.all([sensorPromise, lublinCurrentPromise, lublinHistoryPromise, lublinModelPromise, sunDailyPromise, fullSensorPromise]);
           const sensorData = results[0];
@@ -3098,11 +3160,11 @@ Założenia i interpretacja działania:
       function updateAutoTimerBox() {
         if (!el.autoTimerBox || !el.autoTimerValue) return;
 
-        if (!el.autoToggle.checked) {
+        if (!autoTimerVisible) {
           el.autoTimerBox.classList.add('hidden');
           el.autoTimerBox.classList.remove('expanded');
           el.autoTimerValue.textContent = '-- s';
-          el.autoTimerState.textContent = 'AUTO wyłączone.';
+          el.autoTimerState.textContent = 'Wstążka z timerem ukryta.';
           return;
         }
 
@@ -3111,6 +3173,16 @@ Założenia i interpretacja działania:
         el.autoTimerDetails.classList.toggle('hidden', !autoTimerExpanded);
         el.autoExpandBtn.textContent = '...';
 
+        if (!el.autoToggle.checked) {
+          el.autoTimerValue.textContent = '-- s';
+          el.autoTimerState.textContent = 'AUTO wyłączone. Wstążka jest widoczna, ale odliczanie nie działa.';
+          el.autoPauseBtn.textContent = '▶';
+          el.autoPauseBtn.title = 'AUTO wyłączone';
+          el.autoDisableBtn.textContent = 'Włącz AUTO';
+          return;
+        }
+
+        el.autoDisableBtn.textContent = 'Wyłącz AUTO';
         const remainingMs = getAutoRemainingMs();
         el.autoTimerValue.textContent = formatAutoTimerValue(remainingMs);
 
@@ -3193,6 +3265,14 @@ Założenia i interpretacja działania:
         updateAutoTimerBox();
       }
 
+      function toggleAutoTimerVisibility() {
+        autoTimerVisible = el.autoTimerShowToggle.checked;
+        if (!autoTimerVisible) {
+          autoTimerExpanded = false;
+        }
+        updateAutoTimerBox();
+      }
+
       function refreshNowFromAutoBox() {
         refreshDashboardFromCurrentSelection();
         if (el.autoToggle.checked && !autoRefreshPaused) {
@@ -3209,12 +3289,20 @@ Założenia i interpretacja działania:
         setDebugInfo('Licznik automatycznego odświeżania został zresetowany.');
       }
 
-      function disableAutoRefreshFromBox() {
-        el.autoToggle.checked = false;
-        autoRefreshPaused = false;
-        autoTimerExpanded = false;
-        clearAutoRefreshTimers();
-        setDebugInfo('Automatyczne odświeżanie zostało wyłączone z okienka timera.');
+      function toggleAutoRefreshFromBox() {
+        if (el.autoToggle.checked) {
+          el.autoToggle.checked = false;
+          autoRefreshPaused = false;
+          clearAutoRefreshTimers();
+          setDebugInfo('Automatyczne odświeżanie zostało wyłączone z wstążki timera.');
+        } else {
+          el.autoToggle.checked = true;
+          autoRefreshPaused = false;
+          autoPausedRemainingMs = null;
+          restartTimer();
+          setDebugInfo('Automatyczne odświeżanie zostało włączone z wstążki timera.');
+        }
+        updateAutoTimerBox();
       }
 
       function syncAutoIntervalSelects(source) {
@@ -3267,7 +3355,7 @@ Założenia i interpretacja działania:
         console.assert(formatHoursLabel(24) === '24 h (1.00 dni)', 'Test formatHoursLabel nie przeszedł.');
         console.assert(DEFAULT_START_DATE_STR === '2026-03-29T00:00', 'Test domyślnej daty początkowej nie przeszedł.');
         console.assert(currentRangeHours === 120, 'Test domyślnego zakresu 5 dni nie przeszedł.');
-        console.assert(el.autoTimerBox && el.autoTimerValue && el.autoTimerState && el.autoPauseBtn && el.autoExpandBtn && el.autoTimerDetails && el.autoTimerIntervalSelect && el.autoRefreshNowBtn && el.autoResetBtn && el.autoDisableBtn, 'Test elementów timera AUTO nie przeszedł.');
+        console.assert(el.autoTimerShowToggle && el.autoTimerBox && el.autoTimerValue && el.autoTimerState && el.autoPauseBtn && el.autoExpandBtn && el.autoTimerDetails && el.autoTimerIntervalSelect && el.autoRefreshNowBtn && el.autoResetBtn && el.autoDisableBtn, 'Test elementów wstążki timera nie przeszedł.');
         console.assert(THREE_D_CHART_IDS.length === 6, 'Test listy wykresów 3D nie przeszedł.');
         const r = computePaddedYRange([1, 2, null, NaN, 'x']);
         console.assert(Array.isArray(r) && r.length === 2 && r[0] < 1 && r[1] > 2, 'Test computePaddedYRange nie przeszedł.');
@@ -3372,16 +3460,20 @@ Założenia i interpretacja działania:
             autoRefreshPaused = false;
             restartTimer();
           } else {
-            disableAutoRefreshFromBox();
+            autoRefreshPaused = false;
+            clearAutoRefreshTimers();
+            updateAutoTimerBox();
+            setDebugInfo('Automatyczne odświeżanie zostało wyłączone. Widoczność wstążki timera pozostaje niezależna.');
           }
         });
+        el.autoTimerShowToggle.addEventListener('change', toggleAutoTimerVisibility);
         el.intervalSelect.addEventListener('change', function () { syncAutoIntervalSelects('main'); });
         el.autoTimerIntervalSelect.addEventListener('change', function () { syncAutoIntervalSelects('floating'); });
         el.autoRefreshNowBtn.addEventListener('click', refreshNowFromAutoBox);
         el.autoPauseBtn.addEventListener('click', toggleAutoPauseFromBox);
         el.autoExpandBtn.addEventListener('click', toggleAutoTimerDetails);
         el.autoResetBtn.addEventListener('click', resetAutoTimerFromBox);
-        el.autoDisableBtn.addEventListener('click', disableAutoRefreshFromBox);
+        el.autoDisableBtn.addEventListener('click', toggleAutoRefreshFromBox);
         el.refreshBtn.addEventListener('click', refreshDashboardFromCurrentSelection);
         el.reset3dViewsBtn.addEventListener('click', resetAll3DViews);
         el.toggleAll3dLegendsBtn.addEventListener('click', toggleAll3DLegends);
@@ -3507,6 +3599,7 @@ Założenia i interpretacja działania:
         runSelfTests();
         bindUi();
         el.autoTimerIntervalSelect.value = el.intervalSelect.value;
+        el.autoTimerShowToggle.checked = autoTimerVisible;
         updateAutoTimerBox();
         const now = new Date();
         const defaultStart = new Date(DEFAULT_START_DATE_STR);
