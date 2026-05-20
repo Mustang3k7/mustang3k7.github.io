@@ -318,6 +318,229 @@ Założenia i interpretacja działania:
       font-size: 14px;
       padding: 10px 6px 12px 6px;
     }
+
+    .auto-timer {
+      position: fixed;
+      right: 0;
+      top: 40vh;
+      transform: translate(8px, -50%);
+      z-index: 30;
+      display: grid;
+      justify-items: center;
+      align-items: center;
+      gap: 6px;
+      width: 46px;
+      max-width: calc(100vw - 12px);
+      padding: 7px 4px;
+      border: 1px solid rgba(79, 140, 255, 0.38);
+      border-right: 0;
+      border-radius: 14px 0 0 14px;
+      background: rgba(15, 23, 42, 0.78);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(8px);
+      overflow: hidden;
+      transition:
+        transform 0.216s ease-out 0s,
+        width 0.270s ease-out 0.108s,
+        background 0.270s ease-out 0.108s,
+        padding 0.270s ease-out 0.108s,
+        border-color 0.270s ease-out 0.108s;
+    }
+
+    .auto-timer.expanded {
+      transform: translate(0, -50%);
+      width: 246px;
+      justify-items: stretch;
+      align-items: stretch;
+      padding: 10px;
+      background: rgba(15, 23, 42, 0.94);
+    }
+
+    .auto-timer.hidden {
+      display: none;
+    }
+
+    .auto-timer-label,
+    .auto-timer-state {
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      visibility: hidden;
+      transform: translateX(8px);
+      transition:
+        opacity 0.18s ease-out,
+        transform 0.18s ease-out,
+        max-height 0.18s ease-out,
+        visibility 0s linear 0.18s;
+    }
+
+    .auto-timer:not(.expanded) .auto-timer-state {
+      max-height: 0;
+      opacity: 0;
+      visibility: hidden;
+      padding: 0;
+      pointer-events: none;
+    }
+
+    .auto-timer:not(.expanded) .auto-timer-details {
+      max-height: 0;
+      opacity: 0;
+      visibility: hidden;
+      padding-top: 0;
+      border-top-color: transparent;
+      pointer-events: none;
+    }
+
+    .auto-timer.expanded .auto-timer-state {
+      max-height: 48px;
+      opacity: 1;
+      visibility: visible;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.25;
+      padding: 2px 2px 0 2px;
+      transform: translateX(0);
+      transition:
+        opacity 0.252s ease-out 0.387s,
+        transform 0.234s ease-out 0.387s,
+        max-height 0.198s ease-out 0.324s,
+        visibility 0s linear 0s;
+    }
+
+    .auto-timer-value {
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 1.05;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      white-space: nowrap;
+      color: var(--text);
+      text-align: center;
+    }
+
+    .auto-timer.expanded .auto-timer-value {
+      writing-mode: horizontal-tb;
+      transform: none;
+      font-size: 20px;
+      align-self: center;
+    }
+
+    .auto-timer-actions {
+      display: grid;
+      grid-template-rows: 34px auto 34px;
+      justify-items: center;
+      align-items: center;
+      gap: 7px;
+      width: 100%;
+    }
+
+    .auto-timer.expanded .auto-timer-actions {
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr) 40px;
+      grid-template-rows: auto;
+      gap: 10px;
+      align-items: center;
+      width: 100%;
+    }
+
+    .auto-timer .btn {
+      min-width: 30px;
+      min-height: 32px;
+      padding: 5px 5px;
+      font-size: 16px;
+      border-radius: 9px;
+    }
+
+    .auto-timer:not(.expanded) .btn {
+      min-width: 32px;
+      min-height: 34px;
+      padding: 5px 6px;
+    }
+
+    .auto-timer-details {
+      display: grid;
+      gap: 10px;
+      width: 100%;
+      max-height: 220px;
+      opacity: 1;
+      visibility: visible;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      transform: translateX(0);
+      overflow: hidden;
+      transition:
+        opacity 0.162s ease-out 0.342s,
+        transform 0.162s ease-out 0.342s,
+        max-height 0.216s ease-out 0.306s,
+        padding-top 0.162s ease-out 0.306s,
+        border-top-color 0.162s ease-out 0.306s,
+        visibility 0s linear 0s;
+    }
+
+    .auto-timer-details.hidden {
+      max-height: 0;
+      opacity: 0;
+      visibility: hidden;
+      padding-top: 0;
+      border-top-color: transparent;
+      transform: translateX(10px);
+      pointer-events: none;
+      transition:
+        opacity 0.12s ease-out,
+        transform 0.12s ease-out,
+        max-height 0.16s ease-out,
+        padding-top 0.12s ease-out,
+        border-top-color 0.12s ease-out,
+        visibility 0s linear 0.16s;
+    }
+
+    .auto-timer-details > * {
+      opacity: 0;
+      transform: translateX(8px);
+      transition: opacity 0.234s ease-out, transform 0.234s ease-out;
+    }
+
+    .auto-timer.expanded .auto-timer-details:not(.hidden) > * {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .auto-timer.expanded .auto-timer-details:not(.hidden) > *:nth-child(1) { transition-delay: 0.387s; }
+    .auto-timer.expanded .auto-timer-details:not(.hidden) > *:nth-child(2) { transition-delay: 0.414s; }
+    .auto-timer.expanded .auto-timer-details:not(.hidden) > *:nth-child(3) { transition-delay: 0.441s; }
+    .auto-timer.expanded .auto-timer-details:not(.hidden) > *:nth-child(4) { transition-delay: 0.468s; }
+
+    .auto-timer-details.hidden > * {
+      opacity: 0;
+      transform: translateX(8px);
+      transition-delay: 0s;
+    }
+
+    .auto-timer-details label {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .auto-timer-details .select {
+      width: 100%;
+      min-height: 32px;
+      padding: 5px 8px;
+      border-radius: 8px;
+      font-size: 12px;
+    }
+
+    @media (max-width: 520px) {
+      .auto-timer {
+        width: 46px;
+        opacity: 0.92;
+      }
+
+      .auto-timer.expanded {
+        width: min(238px, calc(100vw - 12px));
+      }
+    }
   </style>
 </head>
 <body>
@@ -605,6 +828,29 @@ Założenia i interpretacja działania:
       <div id="copyReportInfo" class="info-line">Raport można wkleić do notatki, wiadomości albo dokumentacji.</div>
     </section>
 
+    <div id="autoTimerBox" class="auto-timer hidden" aria-live="polite">
+      <div class="auto-timer-label">AUTO odświeżanie</div>
+      <div id="autoTimerState" class="auto-timer-state">Oczekiwanie.</div>
+      <div class="auto-timer-actions">
+        <button id="autoExpandBtn" class="btn" type="button" title="Opcje AUTO">...</button>
+        <div id="autoTimerValue" class="auto-timer-value">-- s</div>
+        <button id="autoPauseBtn" class="btn" type="button" title="Pauza / start">⏸</button>
+      </div>
+      <div id="autoTimerDetails" class="auto-timer-details hidden">
+        <label for="autoTimerIntervalSelect">Interwał:
+          <select id="autoTimerIntervalSelect" class="select">
+            <option value="10">10 s</option>
+            <option value="20" selected>20 s</option>
+            <option value="30">30 s</option>
+            <option value="60">60 s</option>
+          </select>
+        </label>
+        <button id="autoRefreshNowBtn" class="btn" type="button">Odśwież teraz</button>
+        <button id="autoResetBtn" class="btn" type="button">Reset licznika</button>
+        <button id="autoDisableBtn" class="btn" type="button">Wyłącz AUTO</button>
+      </div>
+    </div>
+
     <section class="card chart-card">
       <div class="chart-head">
         <div><div class="chart-title">Eksport danych</div><div class="chart-subtitle">Możesz pobrać bieżący zakres albo pełny zbiór sensora</div></div>
@@ -658,6 +904,11 @@ Założenia i interpretacja działania:
       let currentRangeHours = 120;
       let useCustomRange = false;
       let refreshTimer = null;
+      let autoCountdownTimer = null;
+      let autoRefreshDeadlineMs = null;
+      let autoPausedRemainingMs = null;
+      let autoRefreshPaused = false;
+      let autoTimerExpanded = false;
       let lublinGeo = null;
       let lublinGeoPromise = null;
       let chartUiRevision = 0;
@@ -745,6 +996,16 @@ Założenia i interpretacja działania:
         status: byId('status'),
         autoToggle: byId('autoToggle'),
         intervalSelect: byId('intervalSelect'),
+        autoTimerBox: byId('autoTimerBox'),
+        autoTimerValue: byId('autoTimerValue'),
+        autoTimerState: byId('autoTimerState'),
+        autoPauseBtn: byId('autoPauseBtn'),
+        autoExpandBtn: byId('autoExpandBtn'),
+        autoTimerDetails: byId('autoTimerDetails'),
+        autoTimerIntervalSelect: byId('autoTimerIntervalSelect'),
+        autoRefreshNowBtn: byId('autoRefreshNowBtn'),
+        autoResetBtn: byId('autoResetBtn'),
+        autoDisableBtn: byId('autoDisableBtn'),
         refreshBtn: byId('refreshBtn'),
         reset3dViewsBtn: byId('reset3dViewsBtn'),
         toggleAll3dLegendsBtn: byId('toggleAll3dLegendsBtn'),
@@ -2815,13 +3076,152 @@ Założenia i interpretacja działania:
         }
       }
 
-      function restartTimer() {
-        if (refreshTimer) clearInterval(refreshTimer);
-        if (!el.autoToggle.checked) return;
+      function formatAutoTimerValue(ms) {
+        const safeMs = Math.max(0, Number(ms) || 0);
+        const secondsTotal = Math.ceil(safeMs / 1000);
+        if (secondsTotal < 60) return secondsTotal + ' s';
+        const minutes = Math.floor(secondsTotal / 60);
+        const seconds = secondsTotal % 60;
+        return minutes + ':' + String(seconds).padStart(2, '0');
+      }
+
+      function getAutoRemainingMs() {
+        if (autoRefreshPaused && Number.isFinite(autoPausedRemainingMs)) {
+          return autoPausedRemainingMs;
+        }
+        if (autoRefreshDeadlineMs) {
+          return Math.max(0, autoRefreshDeadlineMs - Date.now());
+        }
+        return getAutoIntervalSeconds() * 1000;
+      }
+
+      function updateAutoTimerBox() {
+        if (!el.autoTimerBox || !el.autoTimerValue) return;
+
+        if (!el.autoToggle.checked) {
+          el.autoTimerBox.classList.add('hidden');
+          el.autoTimerBox.classList.remove('expanded');
+          el.autoTimerValue.textContent = '-- s';
+          el.autoTimerState.textContent = 'AUTO wyłączone.';
+          return;
+        }
+
+        el.autoTimerBox.classList.remove('hidden');
+        el.autoTimerBox.classList.toggle('expanded', autoTimerExpanded);
+        el.autoTimerDetails.classList.toggle('hidden', !autoTimerExpanded);
+        el.autoExpandBtn.textContent = '...';
+
+        const remainingMs = getAutoRemainingMs();
+        el.autoTimerValue.textContent = formatAutoTimerValue(remainingMs);
+
+        if (autoRefreshPaused) {
+          el.autoTimerState.textContent = 'Odświeżanie wstrzymane. Licznik zachował pozostały czas.';
+          el.autoPauseBtn.textContent = '▶';
+          el.autoPauseBtn.title = 'Start';
+          return;
+        }
+
+        el.autoTimerState.textContent = 'Następne odświeżenie za podany czas.';
+        el.autoPauseBtn.textContent = '⏸';
+        el.autoPauseBtn.title = 'Pauza';
+      }
+
+      function clearAutoRefreshTimers(resetState) {
+        if (refreshTimer) clearTimeout(refreshTimer);
+        if (autoCountdownTimer) clearInterval(autoCountdownTimer);
+        refreshTimer = null;
+        autoCountdownTimer = null;
+        if (resetState !== false) {
+          autoRefreshDeadlineMs = null;
+          autoPausedRemainingMs = null;
+        }
+        updateAutoTimerBox();
+      }
+
+      function getAutoIntervalSeconds() {
         const intervalSec = parseInt(el.intervalSelect.value, 10);
-        refreshTimer = setInterval(function () {
+        return Number.isFinite(intervalSec) && intervalSec > 0 ? intervalSec : 20;
+      }
+
+      function restartTimer() {
+        clearAutoRefreshTimers(false);
+        if (!el.autoToggle.checked) {
+          autoRefreshPaused = false;
+          autoTimerExpanded = false;
+          autoPausedRemainingMs = null;
+          autoRefreshDeadlineMs = null;
+          updateAutoTimerBox();
+          return;
+        }
+
+        if (autoRefreshPaused) {
+          updateAutoTimerBox();
+          return;
+        }
+
+        const delayMs = Number.isFinite(autoPausedRemainingMs)
+          ? Math.max(1000, autoPausedRemainingMs)
+          : getAutoIntervalSeconds() * 1000;
+        autoPausedRemainingMs = null;
+        autoRefreshDeadlineMs = Date.now() + delayMs;
+        updateAutoTimerBox();
+
+        autoCountdownTimer = setInterval(updateAutoTimerBox, 250);
+        refreshTimer = setTimeout(function () {
+          autoPausedRemainingMs = null;
           refreshDashboardFromCurrentSelection({ cancelRunning: false });
-        }, intervalSec * 1000);
+          if (el.autoToggle.checked && !autoRefreshPaused) restartTimer();
+        }, delayMs);
+      }
+
+      function toggleAutoPauseFromBox() {
+        if (!el.autoToggle.checked) return;
+        autoRefreshPaused = !autoRefreshPaused;
+        if (autoRefreshPaused) {
+          autoPausedRemainingMs = getAutoRemainingMs();
+          clearAutoRefreshTimers(false);
+          setDebugInfo('Automatyczne odświeżanie zostało wstrzymane z okienka timera; pozostały czas został zachowany.');
+        } else {
+          setDebugInfo('Automatyczne odświeżanie zostało wznowione z okienka timera bez resetowania licznika.');
+          restartTimer();
+        }
+        updateAutoTimerBox();
+      }
+
+      function toggleAutoTimerDetails() {
+        autoTimerExpanded = !autoTimerExpanded;
+        updateAutoTimerBox();
+      }
+
+      function refreshNowFromAutoBox() {
+        refreshDashboardFromCurrentSelection();
+        if (el.autoToggle.checked && !autoRefreshPaused) {
+          restartTimer();
+        }
+        setDebugInfo('Ręczne odświeżenie uruchomione z panelu AUTO.');
+      }
+
+      function resetAutoTimerFromBox() {
+        if (!el.autoToggle.checked) return;
+        autoRefreshPaused = false;
+        autoPausedRemainingMs = null;
+        restartTimer();
+        setDebugInfo('Licznik automatycznego odświeżania został zresetowany.');
+      }
+
+      function disableAutoRefreshFromBox() {
+        el.autoToggle.checked = false;
+        autoRefreshPaused = false;
+        autoTimerExpanded = false;
+        clearAutoRefreshTimers();
+        setDebugInfo('Automatyczne odświeżanie zostało wyłączone z okienka timera.');
+      }
+
+      function syncAutoIntervalSelects(source) {
+        const value = source === 'floating' ? el.autoTimerIntervalSelect.value : el.intervalSelect.value;
+        el.intervalSelect.value = value;
+        el.autoTimerIntervalSelect.value = value;
+        restartTimer();
       }
 
       function syncActiveRangeButtons() {
@@ -2867,6 +3267,7 @@ Założenia i interpretacja działania:
         console.assert(formatHoursLabel(24) === '24 h (1.00 dni)', 'Test formatHoursLabel nie przeszedł.');
         console.assert(DEFAULT_START_DATE_STR === '2026-03-29T00:00', 'Test domyślnej daty początkowej nie przeszedł.');
         console.assert(currentRangeHours === 120, 'Test domyślnego zakresu 5 dni nie przeszedł.');
+        console.assert(el.autoTimerBox && el.autoTimerValue && el.autoTimerState && el.autoPauseBtn && el.autoExpandBtn && el.autoTimerDetails && el.autoTimerIntervalSelect && el.autoRefreshNowBtn && el.autoResetBtn && el.autoDisableBtn, 'Test elementów timera AUTO nie przeszedł.');
         console.assert(THREE_D_CHART_IDS.length === 6, 'Test listy wykresów 3D nie przeszedł.');
         const r = computePaddedYRange([1, 2, null, NaN, 'x']);
         console.assert(Array.isArray(r) && r.length === 2 && r[0] < 1 && r[1] > 2, 'Test computePaddedYRange nie przeszedł.');
@@ -2966,8 +3367,21 @@ Założenia i interpretacja działania:
 
         el.loadDefaultStartBtn.addEventListener('click', applyDefaultStartRange);
         el.resetRangeBtn.addEventListener('click', function () { applyQuickRange(currentRangeHours); });
-        el.autoToggle.addEventListener('change', restartTimer);
-        el.intervalSelect.addEventListener('change', restartTimer);
+        el.autoToggle.addEventListener('change', function () {
+          if (el.autoToggle.checked) {
+            autoRefreshPaused = false;
+            restartTimer();
+          } else {
+            disableAutoRefreshFromBox();
+          }
+        });
+        el.intervalSelect.addEventListener('change', function () { syncAutoIntervalSelects('main'); });
+        el.autoTimerIntervalSelect.addEventListener('change', function () { syncAutoIntervalSelects('floating'); });
+        el.autoRefreshNowBtn.addEventListener('click', refreshNowFromAutoBox);
+        el.autoPauseBtn.addEventListener('click', toggleAutoPauseFromBox);
+        el.autoExpandBtn.addEventListener('click', toggleAutoTimerDetails);
+        el.autoResetBtn.addEventListener('click', resetAutoTimerFromBox);
+        el.autoDisableBtn.addEventListener('click', disableAutoRefreshFromBox);
         el.refreshBtn.addEventListener('click', refreshDashboardFromCurrentSelection);
         el.reset3dViewsBtn.addEventListener('click', resetAll3DViews);
         el.toggleAll3dLegendsBtn.addEventListener('click', toggleAll3DLegends);
@@ -3092,6 +3506,8 @@ Założenia i interpretacja działania:
         syncProjectionStateFromControls();
         runSelfTests();
         bindUi();
+        el.autoTimerIntervalSelect.value = el.intervalSelect.value;
+        updateAutoTimerBox();
         const now = new Date();
         const defaultStart = new Date(DEFAULT_START_DATE_STR);
         useCustomRange = false;
